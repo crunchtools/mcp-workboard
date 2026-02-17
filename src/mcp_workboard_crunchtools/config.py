@@ -51,7 +51,7 @@ class Config:
 
         This is intentionally not configurable to prevent SSRF attacks.
         """
-        return "https://www.myworkboard.com/wb/apis/v1"
+        return "https://www.myworkboard.com/wb/apis"
 
     def __repr__(self) -> str:
         """Safe repr that never exposes the token."""
