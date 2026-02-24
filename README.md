@@ -39,10 +39,15 @@ The container image is built on the [Hummingbird Python base image](https://quay
 - `workboard_create_user` - Create a new user (Data-Admin role required)
 - `workboard_update_user` - Update an existing user
 
-### Objective Management (3 tools)
+### Objective Management (4 tools)
 - `workboard_get_objectives` - Get objectives associated with a user (API capped at 15)
 - `workboard_get_objective_details` - Get details for a specific objective with key results
 - `workboard_get_my_objectives` - Get the current user's owned objectives by ID (recommended)
+- `workboard_create_objective` - Create a new objective with key results (Data-Admin required)
+
+### Key Result Management (2 tools)
+- `workboard_get_my_key_results` - List current user's key results with metric IDs and progress
+- `workboard_update_key_result` - Update key result progress for weekly OKR check-ins
 
 ## Installation
 
@@ -125,6 +130,27 @@ Assistant: [calls workboard_get_objective_details with user_id=12345, objective_
 ```
 User: Show me my objectives (IDs: 2900058, 2900075, 2901770)
 Assistant: [calls workboard_get_my_objectives with objective_ids=[2900058, 2900075, 2901770]]
+```
+
+### List My Key Results
+
+```
+User: Show me my key results
+Assistant: [calls workboard_get_my_key_results]
+```
+
+### Update Key Result Progress
+
+```
+User: Update key result 12345 to 75
+Assistant: [calls workboard_update_key_result with metric_id=12345, value="75"]
+```
+
+### Create an Objective
+
+```
+User: Create an objective called "Increase retention" owned by user@example.com
+Assistant: [calls workboard_create_objective with name, owner, dates, and optional key_results]
 ```
 
 ## Security

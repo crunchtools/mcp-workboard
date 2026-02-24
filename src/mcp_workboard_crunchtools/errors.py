@@ -37,6 +37,13 @@ class InvalidObjectiveIdError(UserError):
         super().__init__("Invalid objective_id format. Expected positive integer.")
 
 
+class InvalidMetricIdError(UserError):
+    """Invalid metric ID format."""
+
+    def __init__(self) -> None:
+        super().__init__("Invalid metric_id format. Expected positive integer.")
+
+
 class NotFoundError(UserError):
     """Resource not found or not accessible."""
 

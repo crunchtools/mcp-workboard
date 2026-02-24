@@ -3,10 +3,15 @@
 import pytest
 from pydantic import ValidationError
 
-from mcp_workboard_crunchtools.errors import InvalidObjectiveIdError, InvalidUserIdError
+from mcp_workboard_crunchtools.errors import (
+    InvalidMetricIdError,
+    InvalidObjectiveIdError,
+    InvalidUserIdError,
+)
 from mcp_workboard_crunchtools.models import (
     CreateUserInput,
     UpdateUserInput,
+    validate_metric_id,
     validate_objective_id,
     validate_user_id,
 )
@@ -50,6 +55,28 @@ class TestObjectiveIdValidation:
         """Negative integer should fail."""
         with pytest.raises(InvalidObjectiveIdError):
             validate_objective_id(-1)
+
+
+class TestMetricIdValidation:
+    """Tests for metric_id validation."""
+
+    def test_valid_metric_id(self) -> None:
+        """Valid positive integer should pass."""
+        assert validate_metric_id(789) == 789
+
+    def test_valid_metric_id_large(self) -> None:
+        """Large positive integer should pass."""
+        assert validate_metric_id(999999) == 999999
+
+    def test_invalid_metric_id_zero(self) -> None:
+        """Zero should fail."""
+        with pytest.raises(InvalidMetricIdError):
+            validate_metric_id(0)
+
+    def test_invalid_metric_id_negative(self) -> None:
+        """Negative integer should fail."""
+        with pytest.raises(InvalidMetricIdError):
+            validate_metric_id(-1)
 
 
 class TestCreateUserInput:

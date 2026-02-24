@@ -9,12 +9,15 @@ from typing import Any
 from fastmcp import FastMCP
 
 from .tools import (
+    create_objective,
     create_user,
+    get_my_key_results,
     get_my_objectives,
     get_objective_details,
     get_objectives,
     get_user,
     list_users,
+    update_key_result,
     update_user,
 )
 
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Create the FastMCP server
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
-    version="0.2.0",
+    version="0.3.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -31,6 +34,8 @@ mcp = FastMCP(
         "with their known objective IDs for reliable results. The list endpoint "
         "(workboard_get_objectives_tool) has a hard cap of 15 results and returns objectives "
         "the user is associated with, not ones they own. "
+        "To update OKR progress, first use workboard_get_my_key_results_tool to find metric IDs, "
+        "then use workboard_update_key_result_tool to check in. "
         "To identify the current user, call workboard_get_user_tool with no arguments."
     ),
 )
@@ -193,3 +198,100 @@ async def workboard_get_my_objectives_tool(
         List of objectives with their key results (metrics), plus user_id
     """
     return await get_my_objectives(objective_ids=objective_ids)
+
+
+# Register Key Result tools
+
+
+@mcp.tool()
+async def workboard_get_my_key_results_tool(
+    include_prior_years: bool = False,
+) -> dict[str, Any]:
+    """List all key results (metrics) the current user owns or has access to.
+
+    Use this to find metric IDs and see current progress before updating
+    with workboard_update_key_result_tool. Returns metric names, current
+    values, targets, and IDs.
+
+    By default, only shows current year key results. Set include_prior_years=True
+    to see key results from previous years.
+
+    Args:
+        include_prior_years: If True, include key results from prior years.
+                             Defaults to False (current year only).
+
+    Returns:
+        List of key results with IDs, names, values, and targets
+    """
+    return await get_my_key_results(include_prior_years=include_prior_years)
+
+
+@mcp.tool()
+async def workboard_update_key_result_tool(
+    metric_id: int,
+    value: str,
+    comment: str | None = None,
+) -> dict[str, Any]:
+    """Update progress on a key result (metric). This is the primary tool
+    for weekly OKR check-ins — update a key result's value without logging
+    into WorkBoard.
+
+    Use workboard_get_my_key_results_tool to find metric IDs first.
+
+    Args:
+        metric_id: Metric ID (positive integer). Get this from
+                   workboard_get_my_key_results_tool.
+        value: The new progress value (e.g. "75" for 75%).
+        comment: Optional check-in comment describing what changed.
+
+    Returns:
+        Updated key result details
+    """
+    return await update_key_result(
+        metric_id=metric_id,
+        value=value,
+        comment=comment,
+    )
+
+
+@mcp.tool()
+async def workboard_create_objective_tool(
+    name: str,
+    owner: str,
+    start_date: str,
+    target_date: str,
+    narrative: str | None = None,
+    goal_type: str = "1",
+    permission: str = "internal,team",
+    key_results: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Create a new objective with optional key results (requires Data-Admin token).
+
+    Provide the goal name, owner, dates, and optionally key results with targets.
+    Each key result dict can include: metric_name, metric_start, metric_target,
+    metric_type.
+
+    Args:
+        name: Objective name (e.g. "Increase customer retention")
+        owner: Owner's email address or user ID
+        start_date: Start date in YYYY-MM-DD format
+        target_date: Target completion date in YYYY-MM-DD format
+        narrative: Optional description/narrative for the objective
+        goal_type: "1" for Team objective (default), "2" for Personal objective
+        permission: Visibility setting (default "internal,team")
+        key_results: Optional list of key result dicts, each with keys like
+                     "metric_name", "metric_start", "metric_target", "metric_type"
+
+    Returns:
+        Created objective details
+    """
+    return await create_objective(
+        name=name,
+        owner=owner,
+        start_date=start_date,
+        target_date=target_date,
+        narrative=narrative,
+        goal_type=goal_type,
+        permission=permission,
+        key_results=key_results,
+    )
