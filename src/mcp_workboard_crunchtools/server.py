@@ -24,7 +24,15 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
     version="0.2.0",
-    instructions="Secure MCP server for WorkBoard OKR and strategy execution platform",
+    instructions=(
+        "Secure MCP server for WorkBoard OKR and strategy execution platform. "
+        "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
+        "When users ask about 'my objectives' or 'my OKRs', use workboard_get_my_objectives_tool "
+        "with their known objective IDs for reliable results. The list endpoint "
+        "(workboard_get_objectives_tool) has a hard cap of 15 results and returns objectives "
+        "the user is associated with, not ones they own. "
+        "To identify the current user, call workboard_get_user_tool with no arguments."
+    ),
 )
 
 
@@ -119,16 +127,20 @@ async def workboard_update_user_tool(
 async def workboard_get_objectives_tool(
     user_id: int,
 ) -> dict[str, Any]:
-    """Get objectives associated with a WorkBoard user.
+    """Get objectives associated with a WorkBoard user by their user ID.
 
-    Note: The WorkBoard API caps results at 15 and returns objectives
-    the user is associated with, not necessarily ones they own.
+    WARNING: This endpoint has a hard cap of 15 results and returns objectives
+    the user is *associated with* (contributor, viewer, etc.), NOT necessarily
+    ones they own. Prefer workboard_get_my_objectives_tool when the user wants
+    to see their own objectives.
+
+    Use workboard_get_user_tool (no arguments) to find the current user's ID.
 
     Args:
-        user_id: User ID (positive integer)
+        user_id: User ID (positive integer). Get this from workboard_get_user_tool.
 
     Returns:
-        List of objectives for the user
+        List of up to 15 associated objectives (may be incomplete)
     """
     return await get_objectives(user_id=user_id)
 
@@ -138,14 +150,19 @@ async def workboard_get_objective_details_tool(
     user_id: int,
     objective_id: int,
 ) -> dict[str, Any]:
-    """Get details for a specific objective including its key results.
+    """Get full details for a single objective including all its key results.
+
+    Returns the objective name, progress, status, dates, and all key results
+    (metrics) with their targets, progress, and update schedules.
+
+    Use workboard_get_user_tool (no arguments) to find the current user's ID.
 
     Args:
-        user_id: User ID (positive integer)
-        objective_id: Objective ID (positive integer)
+        user_id: User ID (positive integer). Get this from workboard_get_user_tool.
+        objective_id: Objective ID (positive integer).
 
     Returns:
-        Objective details with key results
+        Full objective details with key results (metrics)
     """
     return await get_objective_details(user_id=user_id, objective_id=objective_id)
 
@@ -154,18 +171,25 @@ async def workboard_get_objective_details_tool(
 async def workboard_get_my_objectives_tool(
     objective_ids: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Get the current user's owned objectives with key results.
+    """Get the current authenticated user's owned objectives with key results.
 
-    Provide specific objective IDs for reliable results. Without IDs,
-    falls back to the list endpoint which is capped at 15 results and
-    may not include all owned objectives.
+    This is the RECOMMENDED tool when users ask about "my objectives" or "my OKRs".
+    It automatically determines the current user from the API token.
+
+    BEST PRACTICE: Ask the user for their objective IDs and pass them as
+    objective_ids. This fetches each objective individually and is reliable.
+    Without IDs, the fallback list endpoint has a hard cap of 15 results
+    and may miss owned objectives.
+
+    Example: objective_ids=[2900058, 2900075, 2901770]
 
     Args:
-        objective_ids: Optional list of objective IDs to fetch. Recommended
-                       for reliable results since the list API has a hard
-                       cap of 15 results.
+        objective_ids: List of objective IDs to fetch (recommended). The user
+                       should know their objective IDs from WorkBoard. Without
+                       IDs, falls back to the list API which is capped at 15
+                       and may return incomplete results.
 
     Returns:
-        Objectives with key results for the current user
+        List of objectives with their key results (metrics), plus user_id
     """
     return await get_my_objectives(objective_ids=objective_ids)
