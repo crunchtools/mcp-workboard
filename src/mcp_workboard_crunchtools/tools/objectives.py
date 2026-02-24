@@ -75,9 +75,11 @@ async def get_my_objectives(
     client = get_client()
 
     # Get current user's ID
+    # API returns: {"data": {"user": {"user_id": "123", ...}}}
     user_response = await client.get("/user")
-    user_id: int = user_response.get("user_id", 0)
-    if not user_id:
+    try:
+        user_id = int(user_response["data"]["user"]["user_id"])
+    except (KeyError, TypeError, ValueError):
         return {"error": "Could not determine current user ID"}
 
     if objective_ids is not None:
@@ -96,7 +98,11 @@ async def get_my_objectives(
     # Filter to only objectives owned by this user
     all_goals: list[dict[str, Any]] = response.get("data", [])
     goal_count: int = response.get("goal_count", 0)
-    owned = [g for g in all_goals if g.get("goal_owner") == user_id]
+    uid_str = str(user_id)
+    owned = [
+        g for g in all_goals
+        if str(g.get("goal_owner", "")) == uid_str
+    ]
 
     result: dict[str, Any] = {"objectives": owned, "user_id": user_id}
 
