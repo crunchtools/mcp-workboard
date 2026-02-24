@@ -3,11 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from mcp_workboard_crunchtools.errors import InvalidGoalIdError, InvalidUserIdError
+from mcp_workboard_crunchtools.errors import InvalidObjectiveIdError, InvalidUserIdError
 from mcp_workboard_crunchtools.models import (
     CreateUserInput,
     UpdateUserInput,
-    validate_goal_id,
+    validate_objective_id,
     validate_user_id,
 )
 
@@ -34,22 +34,22 @@ class TestUserIdValidation:
             validate_user_id(-1)
 
 
-class TestGoalIdValidation:
-    """Tests for goal_id validation."""
+class TestObjectiveIdValidation:
+    """Tests for objective_id validation."""
 
-    def test_valid_goal_id(self) -> None:
+    def test_valid_objective_id(self) -> None:
         """Valid positive integer should pass."""
-        assert validate_goal_id(456) == 456
+        assert validate_objective_id(456) == 456
 
-    def test_invalid_goal_id_zero(self) -> None:
+    def test_invalid_objective_id_zero(self) -> None:
         """Zero should fail."""
-        with pytest.raises(InvalidGoalIdError):
-            validate_goal_id(0)
+        with pytest.raises(InvalidObjectiveIdError):
+            validate_objective_id(0)
 
-    def test_invalid_goal_id_negative(self) -> None:
+    def test_invalid_objective_id_negative(self) -> None:
         """Negative integer should fail."""
-        with pytest.raises(InvalidGoalIdError):
-            validate_goal_id(-1)
+        with pytest.raises(InvalidObjectiveIdError):
+            validate_objective_id(-1)
 
 
 class TestCreateUserInput:

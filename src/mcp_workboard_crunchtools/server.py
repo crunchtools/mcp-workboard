@@ -10,8 +10,9 @@ from fastmcp import FastMCP
 
 from .tools import (
     create_user,
-    get_goal_details,
-    get_goals,
+    get_my_objectives,
+    get_objective_details,
+    get_objectives,
     get_user,
     list_users,
     update_user,
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Create the FastMCP server
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
-    version="0.1.0",
+    version="0.2.0",
     instructions="Secure MCP server for WorkBoard OKR and strategy execution platform",
 )
 
@@ -111,36 +112,60 @@ async def workboard_update_user_tool(
     )
 
 
-# Register Goal tools
+# Register Objective tools
 
 
 @mcp.tool()
-async def workboard_get_goals_tool(
+async def workboard_get_objectives_tool(
     user_id: int,
 ) -> dict[str, Any]:
-    """Get all goals for a WorkBoard user.
+    """Get objectives associated with a WorkBoard user.
+
+    Note: The WorkBoard API caps results at 15 and returns objectives
+    the user is associated with, not necessarily ones they own.
 
     Args:
         user_id: User ID (positive integer)
 
     Returns:
-        List of goals for the user
+        List of objectives for the user
     """
-    return await get_goals(user_id=user_id)
+    return await get_objectives(user_id=user_id)
 
 
 @mcp.tool()
-async def workboard_get_goal_details_tool(
+async def workboard_get_objective_details_tool(
     user_id: int,
-    goal_id: int,
+    objective_id: int,
 ) -> dict[str, Any]:
-    """Get details for a specific WorkBoard goal.
+    """Get details for a specific objective including its key results.
 
     Args:
         user_id: User ID (positive integer)
-        goal_id: Goal ID (positive integer)
+        objective_id: Objective ID (positive integer)
 
     Returns:
-        Goal details
+        Objective details with key results
     """
-    return await get_goal_details(user_id=user_id, goal_id=goal_id)
+    return await get_objective_details(user_id=user_id, objective_id=objective_id)
+
+
+@mcp.tool()
+async def workboard_get_my_objectives_tool(
+    objective_ids: list[int] | None = None,
+) -> dict[str, Any]:
+    """Get the current user's owned objectives with key results.
+
+    Provide specific objective IDs for reliable results. Without IDs,
+    falls back to the list endpoint which is capped at 15 results and
+    may not include all owned objectives.
+
+    Args:
+        objective_ids: Optional list of objective IDs to fetch. Recommended
+                       for reliable results since the list API has a hard
+                       cap of 15 results.
+
+    Returns:
+        Objectives with key results for the current user
+    """
+    return await get_my_objectives(objective_ids=objective_ids)

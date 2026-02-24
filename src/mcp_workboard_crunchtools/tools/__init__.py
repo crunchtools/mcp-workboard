@@ -3,7 +3,7 @@
 This package contains all the MCP tool implementations for WorkBoard operations.
 """
 
-from .goals import get_goal_details, get_goals
+from .objectives import get_my_objectives, get_objective_details, get_objectives
 from .users import create_user, get_user, list_users, update_user
 
 __all__ = [
@@ -12,7 +12,8 @@ __all__ = [
     "list_users",
     "create_user",
     "update_user",
-    # Goals
-    "get_goals",
-    "get_goal_details",
+    # Objectives
+    "get_objectives",
+    "get_objective_details",
+    "get_my_objectives",
 ]

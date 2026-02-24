@@ -8,7 +8,7 @@ WorkBoard IDs are positive integers (not hex strings like Cloudflare).
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from .errors import InvalidGoalIdError, InvalidUserIdError
+from .errors import InvalidObjectiveIdError, InvalidUserIdError
 
 
 def validate_user_id(user_id: int) -> int:
@@ -18,11 +18,11 @@ def validate_user_id(user_id: int) -> int:
     return user_id
 
 
-def validate_goal_id(goal_id: int) -> int:
-    """Validate a goal ID is a positive integer."""
-    if not isinstance(goal_id, int) or goal_id <= 0:
-        raise InvalidGoalIdError
-    return goal_id
+def validate_objective_id(objective_id: int) -> int:
+    """Validate an objective ID is a positive integer."""
+    if not isinstance(objective_id, int) or objective_id <= 0:
+        raise InvalidObjectiveIdError
+    return objective_id
 
 
 class CreateUserInput(BaseModel):

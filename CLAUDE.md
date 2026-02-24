@@ -44,17 +44,19 @@ claude mcp add mcp-workboard-crunchtools \
 - `workboard_create_user` - Create a new user (Data-Admin role required)
 - `workboard_update_user` - Update an existing user
 
-### Goal Management (2 tools)
-- `workboard_get_goals` - Get all goals for a user
-- `workboard_get_goal_details` - Get details for a specific goal
+### Objective Management (3 tools)
+- `workboard_get_objectives` - Get objectives associated with a user (API capped at 15)
+- `workboard_get_objective_details` - Get details for a specific objective with key results
+- `workboard_get_my_objectives` - Get the current user's owned objectives by ID (recommended)
 
 ## Example Usage
 
 ```
 User: Who am I in WorkBoard?
 User: List all WorkBoard users
-User: Show me goals for user 12345
-User: Get details on goal 67890 for user 12345
+User: Show me objectives for user 12345
+User: Get details on objective 67890 for user 12345
+User: Show me my objectives (IDs: 2900058, 2900075, 2901770)
 ```
 
 ## Development

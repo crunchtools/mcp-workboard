@@ -30,11 +30,11 @@ class InvalidUserIdError(UserError):
         super().__init__("Invalid user_id format. Expected positive integer.")
 
 
-class InvalidGoalIdError(UserError):
-    """Invalid goal ID format."""
+class InvalidObjectiveIdError(UserError):
+    """Invalid objective ID format."""
 
     def __init__(self) -> None:
-        super().__init__("Invalid goal_id format. Expected positive integer.")
+        super().__init__("Invalid objective_id format. Expected positive integer.")
 
 
 class NotFoundError(UserError):

@@ -19,8 +19,9 @@ class TestToolRegistration:
         """All tool functions should be importable."""
         from mcp_workboard_crunchtools.tools import (
             create_user,
-            get_goal_details,
-            get_goals,
+            get_my_objectives,
+            get_objective_details,
+            get_objectives,
             get_user,
             list_users,
             update_user,
@@ -30,8 +31,9 @@ class TestToolRegistration:
         assert callable(list_users)
         assert callable(create_user)
         assert callable(update_user)
-        assert callable(get_goals)
-        assert callable(get_goal_details)
+        assert callable(get_objectives)
+        assert callable(get_objective_details)
+        assert callable(get_my_objectives)
 
 
 class TestErrorSafety:
@@ -67,7 +69,7 @@ class TestErrorSafety:
         """All errors should inherit from UserError."""
         from mcp_workboard_crunchtools.errors import (
             ConfigurationError,
-            InvalidGoalIdError,
+            InvalidObjectiveIdError,
             InvalidUserIdError,
             NotFoundError,
             PermissionDeniedError,
@@ -79,7 +81,7 @@ class TestErrorSafety:
 
         assert issubclass(ConfigurationError, UserError)
         assert issubclass(InvalidUserIdError, UserError)
-        assert issubclass(InvalidGoalIdError, UserError)
+        assert issubclass(InvalidObjectiveIdError, UserError)
         assert issubclass(NotFoundError, UserError)
         assert issubclass(PermissionDeniedError, UserError)
         assert issubclass(RateLimitError, UserError)
