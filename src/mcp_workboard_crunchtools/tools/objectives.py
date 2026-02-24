@@ -217,8 +217,8 @@ async def _get_objective_ids_from_metrics(client: Any) -> list[int]:
     # Extract unique goal IDs from metrics
     goal_ids: set[int] = set()
     for m in metrics:
-        # WorkBoard metrics reference their parent goal via goal_id or wb_goal_id
-        gid = m.get("goal_id") or m.get("wb_goal_id")
+        # WorkBoard uses "metric_goal_id" to reference the parent objective
+        gid = m.get("metric_goal_id")
         if gid is not None:
             try:
                 goal_ids.add(int(gid))
