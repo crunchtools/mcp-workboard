@@ -26,17 +26,24 @@ logger = logging.getLogger(__name__)
 # Create the FastMCP server
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
-    version="0.3.0",
+    version="0.4.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
         "When users ask about 'my objectives' or 'my OKRs', use workboard_get_my_objectives_tool "
-        "with their known objective IDs for reliable results. The list endpoint "
-        "(workboard_get_objectives_tool) has a hard cap of 15 results and returns objectives "
-        "the user is associated with, not ones they own. "
+        "with no arguments — it auto-discovers objectives from the user's key results. "
         "To update OKR progress, first use workboard_get_my_key_results_tool to find metric IDs, "
         "then use workboard_update_key_result_tool to check in. "
-        "To identify the current user, call workboard_get_user_tool with no arguments."
+        "To identify the current user, call workboard_get_user_tool with no arguments. "
+        "\n\n"
+        "DISPLAY FORMAT: When showing objectives and key results, always use a tree structure. "
+        "Show each objective as a top-level item with its progress, then indent its key results "
+        "beneath it. Example:\n"
+        "- Objective Name (progress%)\n"
+        "  - Key Result 1: current of target\n"
+        "  - Key Result 2: current of target\n"
+        "For key result lists without objectives, use a flat bulleted list with name, progress, "
+        "and target date."
     ),
 )
 
@@ -176,26 +183,19 @@ async def workboard_get_objective_details_tool(
 async def workboard_get_my_objectives_tool(
     objective_ids: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Get the current authenticated user's owned objectives with key results.
+    """Get the current authenticated user's objectives with key results.
 
     This is the RECOMMENDED tool when users ask about "my objectives" or "my OKRs".
-    It automatically determines the current user from the API token.
-
-    BEST PRACTICE: Ask the user for their objective IDs and pass them as
-    objective_ids. This fetches each objective individually and is reliable.
-    Without IDs, the fallback list endpoint has a hard cap of 15 results
-    and may miss owned objectives.
-
-    Example: objective_ids=[2900058, 2900075, 2901770]
+    It automatically determines the current user and discovers their objectives
+    from their key results — no IDs needed.
 
     Args:
-        objective_ids: List of objective IDs to fetch (recommended). The user
-                       should know their objective IDs from WorkBoard. Without
-                       IDs, falls back to the list API which is capped at 15
-                       and may return incomplete results.
+        objective_ids: Optional list of specific objective IDs to fetch.
+                       If not provided, objectives are auto-discovered from
+                       the user's key results.
 
     Returns:
-        List of objectives with their key results (metrics), plus user_id
+        List of objectives with their key results (metrics)
     """
     return await get_my_objectives(objective_ids=objective_ids)
 

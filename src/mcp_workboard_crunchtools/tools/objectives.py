@@ -192,22 +192,57 @@ async def get_objective_details(
     return {"objective": response}
 
 
+async def _get_objective_ids_from_metrics(client: Any) -> list[int]:
+    """Discover objective IDs by fetching all metrics and extracting parent goal IDs.
+
+    The /metric endpoint returns all key results the user has access to.
+    Each metric contains a goal_id linking it to its parent objective.
+    This bypasses the 15-result cap on the /user/{id}/goal list endpoint.
+
+    Returns:
+        Sorted list of unique objective IDs from current-year metrics
+    """
+    response = await client.get("/metric")
+
+    data = response.get("data", {})
+    metrics = data.get("metric", []) if isinstance(data, dict) else []
+
+    # Filter to current year
+    year_start = _current_year_start()
+    metrics = [
+        m for m in metrics
+        if int(m.get("target_date") or 0) >= year_start
+    ]
+
+    # Extract unique goal IDs from metrics
+    goal_ids: set[int] = set()
+    for m in metrics:
+        # WorkBoard metrics reference their parent goal via goal_id or wb_goal_id
+        gid = m.get("goal_id") or m.get("wb_goal_id")
+        if gid is not None:
+            try:
+                goal_ids.add(int(gid))
+            except (ValueError, TypeError):
+                continue
+
+    return sorted(goal_ids)
+
+
 async def get_my_objectives(
     objective_ids: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Get the current user's owned objectives with key results.
+    """Get the current user's objectives with key results.
 
-    When objective IDs are provided, fetches each individually via the
-    detail endpoint (reliable). When no IDs are provided, falls back to
-    the list endpoint which is capped at 15 results and filters by ownership.
+    When objective IDs are provided, fetches each individually (explicit override).
+    When no IDs are provided, auto-discovers objectives by fetching all metrics
+    and extracting parent goal IDs, then fetching each objective individually.
 
     Args:
-        objective_ids: Optional list of objective IDs to fetch individually.
-                       This is the recommended approach since the list endpoint
-                       has a hard cap of 15 results.
+        objective_ids: Optional list of objective IDs to fetch. If not provided,
+                       objectives are auto-discovered from the user's key results.
 
     Returns:
-        Dictionary with objectives list and optional warning about truncation
+        Dictionary with objectives list
     """
     client = get_client()
 
@@ -219,52 +254,39 @@ async def get_my_objectives(
     except (KeyError, TypeError, ValueError):
         return {"error": "Could not determine current user ID"}
 
-    if objective_ids is not None:
-        # Primary path: fetch each objective by ID (handles archived gracefully)
-        objectives: list[dict[str, Any]] = []
-        skipped: list[dict[str, Any]] = []
-        for oid in objective_ids:
-            validated_oid = validate_objective_id(oid)
-            try:
-                detail = await client.get(f"/user/{user_id}/goal/{validated_oid}")
-                goal = detail.get("data", {}).get("user", {}).get("goal", {})
-                if isinstance(goal, dict) and goal:
-                    objectives.append(_format_goal(goal))
-                else:
-                    objectives.append(detail)
-            except UserError:
-                skipped.append({
-                    "objective_id": validated_oid,
-                    "error": "Not accessible (may be archived or from a prior year)",
-                })
+    # Auto-discover objective IDs from metrics if none provided
+    if objective_ids is None:
+        objective_ids = await _get_objective_ids_from_metrics(client)
+        if not objective_ids:
+            return {
+                "objectives": [],
+                "message": (
+                    "No objectives found. No current-year key results were found "
+                    "that link to objectives. You can provide objective IDs explicitly."
+                ),
+            }
 
-        result: dict[str, Any] = {"objectives": objectives}
-        if skipped:
-            result["skipped"] = skipped
-        return result
+    # Fetch each objective by ID (handles archived gracefully)
+    objectives: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    for oid in objective_ids:
+        validated_oid = validate_objective_id(oid)
+        try:
+            detail = await client.get(f"/user/{user_id}/goal/{validated_oid}")
+            goal = detail.get("data", {}).get("user", {}).get("goal", {})
+            if isinstance(goal, dict) and goal:
+                objectives.append(_format_goal(goal))
+            else:
+                objectives.append(detail)
+        except UserError:
+            skipped.append({
+                "objective_id": validated_oid,
+                "error": "Not accessible (may be archived or from a prior year)",
+            })
 
-    # Fallback: list endpoint (capped at 15, returns associated not owned)
-    response = await client.get(f"/user/{user_id}/goal")
-
-    all_goals, goal_count = _extract_goals_from_response(response)
-
-    # Filter to only objectives owned by this user
-    uid_str = str(user_id)
-    owned = [
-        g for g in all_goals
-        if isinstance(g, dict) and str(g.get("goal_owner", "")) == uid_str
-    ]
-
-    formatted = [_format_goal(g) for g in owned]
-    result = {"objectives": formatted}
-
-    if goal_count > len(all_goals):
-        result["warning"] = (
-            f"WorkBoard returned {len(all_goals)} of {goal_count} associated objectives "
-            f"(API hard cap). Some owned objectives may be missing. "
-            f"For reliable results, provide specific objective IDs."
-        )
-
+    result: dict[str, Any] = {"objectives": objectives}
+    if skipped:
+        result["skipped"] = skipped
     return result
 
 
