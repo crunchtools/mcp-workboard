@@ -101,9 +101,10 @@ class WorkBoardClient:
         except httpx.RequestError as e:
             raise WorkBoardApiError(0, f"Request failed: {e}") from e
 
-        # Check response size before parsing
-        content_length = response.headers.get("content-length")
-        if content_length and int(content_length) > MAX_RESPONSE_SIZE:
+        # Check response size using actual body length (not just header)
+        # This handles chunked encoding where content-length is absent
+        body = response.content
+        if len(body) > MAX_RESPONSE_SIZE:
             raise WorkBoardApiError(0, "Response too large")
 
         # Parse response

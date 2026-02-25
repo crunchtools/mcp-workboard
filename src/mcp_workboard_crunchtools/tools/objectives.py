@@ -10,7 +10,13 @@ from typing import Any
 
 from ..client import get_client
 from ..errors import UserError
-from ..models import validate_metric_id, validate_objective_id, validate_user_id
+from ..models import (
+    CreateObjectiveInput,
+    UpdateKeyResultInput,
+    validate_metric_id,
+    validate_objective_id,
+    validate_user_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -336,25 +342,67 @@ async def update_key_result(
 ) -> dict[str, Any]:
     """Update progress on a key result (metric).
 
+    Includes input validation, read-back-before-write guard to warn on
+    significant decreases, and audit logging.
+
     Args:
         metric_id: Metric ID (positive integer)
         value: The new progress value (e.g. "75")
         comment: Optional check-in comment
 
     Returns:
-        Updated metric details
+        Updated metric details (includes warning if value was decreased)
     """
     metric_id = validate_metric_id(metric_id)
 
-    payload: dict[str, str] = {"metric_data": value}
-    if comment is not None:
-        payload["metric_comment"] = comment
+    # Validate inputs via Pydantic
+    validated = UpdateKeyResultInput(value=value, comment=comment)
 
     client = get_client()
 
+    # Read-back-before-write: fetch current value to detect significant decreases
+    current_value: float | None = None
+    metric_name: str = f"metric/{metric_id}"
+    try:
+        current_response = await client.get("/metric")
+        current_metrics = current_response.get("data", {}).get("metric", [])
+        for m in current_metrics:
+            if int(m.get("metric_id", 0)) == metric_id:
+                current_value = float(m.get("metric_achieve_target") or 0)
+                metric_name = m.get("metric_name", metric_name)
+                break
+    except Exception:
+        # Don't block the update if read-back fails
+        logger.warning("Could not read current value for metric %d", metric_id)
+
+    new_value = float(validated.value)
+
+    # Warn on decrease but allow it (the audit log captures it)
+    warning: str | None = None
+    if current_value is not None and new_value < current_value:
+        warning = (
+            f"Value decreased from {current_value} to {new_value} "
+            f"for '{metric_name}' (metric_id={metric_id})"
+        )
+        logger.warning("AUDIT: Key result decrease — %s", warning)
+
+    payload: dict[str, str] = {"metric_data": validated.value}
+    if validated.comment is not None:
+        payload["metric_comment"] = validated.comment
+
     response = await client.put(f"/metric/{metric_id}", json_data=payload)
 
-    return {"key_result": response}
+    logger.info(
+        "AUDIT: Key result updated — metric_id=%d, new_value=%s, comment=%s",
+        metric_id,
+        validated.value,
+        validated.comment or "(none)",
+    )
+
+    result: dict[str, Any] = {"key_result": response}
+    if warning:
+        result["warning"] = warning
+    return result
 
 
 async def create_objective(
@@ -383,17 +431,28 @@ async def create_objective(
     Returns:
         Created objective details
     """
+    # Validate inputs via Pydantic
+    validated = CreateObjectiveInput(
+        name=name,
+        owner=owner,
+        start_date=start_date,
+        target_date=target_date,
+        narrative=narrative,
+        goal_type=goal_type,
+        permission=permission,
+    )
+
     goal: dict[str, Any] = {
-        "goal_name": name,
-        "goal_owner": owner,
-        "goal_start_date": start_date,
-        "goal_target_date": target_date,
-        "goal_type": goal_type,
-        "goal_permission": permission,
+        "goal_name": validated.name,
+        "goal_owner": validated.owner,
+        "goal_start_date": validated.start_date,
+        "goal_target_date": validated.target_date,
+        "goal_type": validated.goal_type,
+        "goal_permission": validated.permission,
     }
 
-    if narrative is not None:
-        goal["goal_narrative"] = narrative
+    if validated.narrative is not None:
+        goal["goal_narrative"] = validated.narrative
 
     if key_results is not None:
         goal["metrics"] = key_results
@@ -401,5 +460,13 @@ async def create_objective(
     client = get_client()
 
     response = await client.post("/goal", json_data={"goals": [goal]})
+
+    logger.info(
+        "AUDIT: Objective created — name=%r, owner=%s, dates=%s to %s",
+        validated.name,
+        validated.owner,
+        validated.start_date,
+        validated.target_date,
+    )
 
     return {"objective": response}

@@ -38,8 +38,7 @@ RUN pip install --no-cache-dir .
 # Verify installation
 RUN python -c "from mcp_workboard_crunchtools import main; print('Installation verified')"
 
-# MCP servers run via stdio, so we need interactive mode
-# The entrypoint runs the MCP server
+# Default: stdio transport (use -i with podman run)
+# HTTP:    --transport streamable-http (use -d -p 8000:8000 with podman run)
+EXPOSE 8000
 ENTRYPOINT ["python", "-m", "mcp_workboard_crunchtools"]
-
-# No CMD needed - the server reads from stdin and writes to stdout
