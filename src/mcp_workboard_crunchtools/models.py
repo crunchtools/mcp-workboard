@@ -100,8 +100,8 @@ class UpdateKeyResultInput(BaseModel):
         """Validate that value is a non-negative number."""
         try:
             num = float(v)
-        except ValueError:
-            raise ValueError(f"Value must be a number, got: {v!r}")
+        except ValueError as err:
+            raise ValueError(f"Value must be a number, got: {v!r}") from err
         if num < 0:
             raise ValueError(f"Value must be non-negative, got: {num}")
         return v
