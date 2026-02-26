@@ -58,11 +58,22 @@ def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
     else:
         progress_str = f"{int(achieved)}% of {int(target)}%"
 
-    return {
+    result: dict[str, Any] = {
         "metric_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
     }
+
+    # Expose last check-in date. metric_last_update is 0 when never checked in.
+    raw_last_update = metric.get("metric_last_update")
+    try:
+        last_update_ts = int(raw_last_update or 0)
+    except (ValueError, TypeError):
+        last_update_ts = 0
+
+    result["last_updated"] = _format_date(last_update_ts) if last_update_ts > 0 else None
+
+    return result
 
 
 def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
