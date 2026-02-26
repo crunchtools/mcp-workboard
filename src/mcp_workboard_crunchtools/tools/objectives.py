@@ -58,11 +58,16 @@ def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
     else:
         progress_str = f"{int(achieved)}% of {int(target)}%"
 
-    return {
+    last_updated = _format_date(metric.get("metric_last_update"))
+
+    result = {
         "metric_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
     }
+    if last_updated:
+        result["last_updated"] = last_updated
+    return result
 
 
 def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
