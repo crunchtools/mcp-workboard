@@ -58,11 +58,23 @@ def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
     else:
         progress_str = f"{int(achieved)}% of {int(target)}%"
 
-    return {
+    result: dict[str, Any] = {
         "metric_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
+        "target_date": _format_date(metric.get("target_date")),
     }
+
+    # Expose last check-in date. metric_last_update is 0 when never checked in.
+    raw_last_update = metric.get("metric_last_update")
+    try:
+        last_update_ts = int(raw_last_update or 0)
+    except (ValueError, TypeError):
+        last_update_ts = 0
+
+    result["last_updated"] = _format_date(last_update_ts) if last_update_ts > 0 else None
+
+    return result
 
 
 def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
@@ -73,6 +85,7 @@ def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
         progress = 0
 
     result: dict[str, Any] = {
+        "objective_id": goal.get("goal_id"),
         "name": goal.get("goal_name", ""),
         "progress": f"{progress}%",
     }
@@ -326,11 +339,7 @@ async def get_my_key_results(
             if int(m.get("target_date") or 0) >= year_start
         ]
 
-    formatted = []
-    for m in metrics:
-        entry = _format_metric(m)
-        entry["target_date"] = _format_date(m.get("target_date"))
-        formatted.append(entry)
+    formatted = [_format_metric(m) for m in metrics]
 
     return {"key_results": formatted}
 
