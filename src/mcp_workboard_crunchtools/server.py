@@ -16,6 +16,7 @@ from .tools import (
     get_objective_details,
     get_objectives,
     get_user,
+    get_user_key_results,
     list_users,
     update_key_result,
     update_user,
@@ -224,6 +225,34 @@ async def workboard_get_my_key_results_tool(
         List of key results with IDs, names, values, and targets
     """
     return await get_my_key_results(include_prior_years=include_prior_years)
+
+
+@mcp.tool()
+async def workboard_get_user_key_results_tool(
+    user_id: int,
+    include_prior_years: bool = False,
+) -> dict[str, Any]:
+    """List key results (metrics) for a specific WorkBoard user by their user ID.
+
+    Use this to see KRs owned by or associated with any user — for example,
+    to review a direct report's key results before a 1:1. Skills layer maps
+    organizational roles (e.g. "direct report") to user IDs; this tool only
+    knows about WorkBoard user IDs.
+
+    Use workboard_list_users_tool to find user IDs by name or email.
+
+    By default, only shows current year key results. Set include_prior_years=True
+    to see key results from previous years.
+
+    Args:
+        user_id: User ID (positive integer). Get this from workboard_list_users_tool.
+        include_prior_years: If True, include key results from prior years.
+                             Defaults to False (current year only).
+
+    Returns:
+        List of key results with IDs, names, values, and targets
+    """
+    return await get_user_key_results(user_id=user_id, include_prior_years=include_prior_years)
 
 
 @mcp.tool()

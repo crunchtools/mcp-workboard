@@ -9,6 +9,7 @@ from .objectives import (
     get_my_objectives,
     get_objective_details,
     get_objectives,
+    get_user_key_results,
     update_key_result,
 )
 from .users import create_user, get_user, list_users, update_user
@@ -25,6 +26,7 @@ __all__ = [
     "get_my_objectives",
     # Key Results
     "get_my_key_results",
+    "get_user_key_results",
     "update_key_result",
     "create_objective",
 ]
