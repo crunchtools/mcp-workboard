@@ -5,6 +5,7 @@ WorkBoard uses "goal" in its API, but these tools expose OKR terminology.
 """
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -117,10 +118,8 @@ def _format_goal(
 
     owner_id = goal.get("goal_owner")
     if owner_id:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["owner_id"] = int(owner_id)
-        except (ValueError, TypeError):
-            pass
 
     team = goal.get("goal_team_name")
     if team:
@@ -417,6 +416,61 @@ async def get_my_key_results(
 
     data = response.get("data", {})
     metrics = data.get("metric", []) if isinstance(data, dict) else []
+
+    if not include_prior_years:
+        year_start = _current_year_start()
+        metrics = [
+            m for m in metrics
+            if int(m.get("target_date") or 0) >= year_start
+        ]
+
+    formatted = [_format_metric(m) for m in metrics]
+
+    return {"key_results": formatted}
+
+
+async def get_user_key_results(
+    user_id: int,
+    include_prior_years: bool = False,
+) -> dict[str, Any]:
+    """List key results (metrics) accessible to a specific WorkBoard user.
+
+    Fetches metrics via /user/{user_id}/metric. The response may include
+    metrics the user owns or is associated with, depending on WorkBoard
+    access rules.
+
+    By default, only returns key results with a target date in the current
+    calendar year or later. Set include_prior_years=True for all key results.
+
+    Args:
+        user_id: User ID (positive integer)
+        include_prior_years: If True, include key results from prior years.
+                             Defaults to False (current year only).
+
+    Returns:
+        Dictionary containing list of key results with their IDs, names,
+        current values, and targets
+    """
+    user_id = validate_user_id(user_id)
+    client = get_client()
+
+    response = await client.get(f"/user/{user_id}/metric")
+
+    data = response.get("data", {})
+
+    # The endpoint may return metrics under data.metric (same shape as /metric)
+    # or nested under data.user.metric — handle both.
+    if isinstance(data, dict):
+        metrics = (
+            data.get("metric")
+            or data.get("user", {}).get("metric")
+            or []
+        )
+    else:
+        metrics = []
+
+    if not isinstance(metrics, list):
+        metrics = []
 
     if not include_prior_years:
         year_start = _current_year_start()
