@@ -34,7 +34,6 @@ async def get_teams() -> dict[str, Any]:
     client = get_client()
     response = await client.get("/team")
 
-    # Handle both list and dict response shapes
     if isinstance(response, list):
         teams = response
     elif isinstance(response, dict):
@@ -45,8 +44,7 @@ async def get_teams() -> dict[str, Any]:
             or []
         )
         if isinstance(teams, dict):
-            # Numeric-keyed dict — convert to list
-            teams = list(teams.values())
+                teams = list(teams.values())
     else:
         teams = []
 
@@ -58,7 +56,6 @@ async def get_team_members(team_id: int) -> dict[str, Any]:
     client = get_client()
     response = await client.get(f"/team/{team_id}/user")
 
-    # Navigate to team_members in the response
     if isinstance(response, dict):
         team_data = (
             response.get("data", {}).get("team")

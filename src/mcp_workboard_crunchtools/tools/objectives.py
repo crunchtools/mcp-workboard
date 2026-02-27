@@ -23,8 +23,6 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 
-# --- Formatting helpers ---
-
 
 def _format_date(timestamp: str | int | None) -> str:
     """Convert Unix timestamp to YYYY-MM-DD."""
@@ -63,30 +61,32 @@ def _format_metric(
     except (ValueError, TypeError):
         achieved = 0
 
-    if unit_name == "Currency":
-        progress_str = f"${int(achieved):,} of ${int(target):,}"
-    elif unit_name == "Number":
-        progress_str = f"{int(achieved)} of {int(target)}"
-    else:
-        progress_str = f"{int(achieved)}% of {int(target)}%"
+    match unit_name:
+        case "Currency":
+            progress_str = f"${int(achieved):,} of ${int(target):,}"
+        case "Number":
+            progress_str = f"{int(achieved)} of {int(target)}"
+        case _:
+            progress_str = f"{int(achieved)}% of {int(target)}%"
 
-    result: dict[str, Any] = {
+    formatted_metric: dict[str, Any] = {
         "metric_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
         "target_date": target_date_override or _format_date(metric.get("target_date")),
     }
 
-    # Expose last check-in date. metric_last_update is 0 when never checked in.
     raw_last_update = metric.get("metric_last_update")
     try:
         last_update_ts = int(raw_last_update or 0)
     except (ValueError, TypeError):
         last_update_ts = 0
 
-    result["last_updated"] = _format_date(last_update_ts) if last_update_ts > 0 else None
+    formatted_metric["last_updated"] = (
+        _format_date(last_update_ts) if last_update_ts > 0 else None
+    )
 
-    return result
+    return formatted_metric
 
 
 def _format_goal(
@@ -106,7 +106,7 @@ def _format_goal(
     except (ValueError, TypeError):
         progress = 0
 
-    result: dict[str, Any] = {
+    formatted_goal: dict[str, Any] = {
         "objective_id": goal.get("goal_id"),
         "name": goal.get("goal_name", ""),
         "progress": f"{progress}%",
@@ -114,25 +114,25 @@ def _format_goal(
 
     owner = goal.get("goal_owner_full_name")
     if owner:
-        result["owner"] = owner
+        formatted_goal["owner"] = owner
 
     owner_id = goal.get("goal_owner")
     if owner_id:
         with contextlib.suppress(ValueError, TypeError):
-            result["owner_id"] = int(owner_id)
+            formatted_goal["owner_id"] = int(owner_id)
 
     team = goal.get("goal_team_name")
     if team:
-        result["team"] = team
+        formatted_goal["team"] = team
 
     start = _format_date(goal.get("goal_start_date"))
     target = _format_date(goal.get("goal_target_date"))
     if start and target:
-        result["dates"] = f"{start} to {target}"
+        formatted_goal["dates"] = f"{start} to {target}"
 
     metrics = goal.get("goal_metrics", [])
     if metrics:
-        result["key_results"] = [
+        formatted_goal["key_results"] = [
             _format_metric(
                 m,
                 target_date_override=(
@@ -144,7 +144,7 @@ def _format_goal(
             for m in metrics
         ]
 
-    return result
+    return formatted_goal
 
 
 def _extract_goals_from_response(response: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
@@ -157,27 +157,27 @@ def _extract_goals_from_response(response: dict[str, Any]) -> tuple[list[dict[st
     Returns:
         Tuple of (goals list, total goal count)
     """
-    data = response.get("data", {})
-    if not isinstance(data, dict):
+    response_data = response.get("data", {})
+    if not isinstance(response_data, dict):
         return [], 0
 
-    goal_count: int = data.get("goal_count", 0)
-    user_data = data.get("user", {})
+    goal_count: int = response_data.get("goal_count", 0)
+    user_data = response_data.get("user", {})
     if not isinstance(user_data, dict):
         return [], goal_count
 
     goals_obj = user_data.get("goal", {})
 
-    if isinstance(goals_obj, dict):
-        # API returns {"0": {goal}, "1": {goal}, ..., "goals_count": N}
-        goals = [
-            v for k, v in goals_obj.items()
-            if k.isdigit() and isinstance(v, dict)
-        ]
-    elif isinstance(goals_obj, list):
-        goals = goals_obj
-    else:
-        goals = []
+    match goals_obj:
+        case dict():
+            goals = [
+                v for k, v in goals_obj.items()
+                if k.isdigit() and isinstance(v, dict)
+            ]
+        case list():
+            goals = goals_obj
+        case _:
+            goals = []
 
     return goals, goal_count
 
@@ -187,8 +187,6 @@ def _current_year_start() -> int:
     now = datetime.now(timezone.utc)
     return int(datetime(now.year, 1, 1, tzinfo=timezone.utc).timestamp())
 
-
-# --- Tool functions ---
 
 
 async def get_objectives(
@@ -248,7 +246,6 @@ async def get_objective_details(
         _fetch_target_date_map(client),
     )
 
-    # Detail endpoint: data.user.goal is a single goal dict
     goal = response.get("data", {}).get("user", {}).get("goal", {})
     if isinstance(goal, dict) and goal:
         return {"objective": _format_goal(goal, metric_target_dates)}
@@ -275,8 +272,6 @@ async def _get_objective_ids_from_metrics(
     data = response.get("data", {})
     all_metrics = data.get("metric", []) if isinstance(data, dict) else []
 
-    # Build target-date lookup from ALL metrics (not just current year)
-    # so that goal enrichment works for any objective we fetch.
     target_date_map: dict[int, str] = {}
     for m in all_metrics:
         mid = m.get("metric_id")
@@ -286,14 +281,12 @@ async def _get_objective_ids_from_metrics(
             except (ValueError, TypeError):
                 continue
 
-    # Filter to current year for ID discovery only
     year_start = _current_year_start()
     current_year_metrics = [
         m for m in all_metrics
         if int(m.get("target_date") or 0) >= year_start
     ]
 
-    # Extract unique goal IDs from current-year metrics
     goal_ids: set[int] = set()
     for m in current_year_metrics:
         gid = m.get("metric_goal_id")
@@ -345,16 +338,12 @@ async def get_my_objectives(
     """
     client = get_client()
 
-    # Get current user's ID
-    # API returns: {"data": {"user": {"user_id": "123", ...}}}
     user_response = await client.get("/user")
     try:
         user_id = int(user_response["data"]["user"]["user_id"])
     except (KeyError, TypeError, ValueError):
         return {"error": "Could not determine current user ID"}
 
-    # Auto-discover objective IDs from metrics if none provided.
-    # Also builds the target-date map in the same fetch for KR enrichment.
     metric_target_dates: dict[int, str] = {}
     if objective_ids is None:
         objective_ids, metric_target_dates = await _get_objective_ids_from_metrics(client)
@@ -367,10 +356,8 @@ async def get_my_objectives(
                 ),
             }
     else:
-        # Explicit IDs provided — still fetch target dates for enrichment
         metric_target_dates = await _fetch_target_date_map(client)
 
-    # Fetch each objective by ID (handles archived gracefully)
     objectives: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     for oid in objective_ids:
@@ -458,8 +445,6 @@ async def get_user_key_results(
 
     data = response.get("data", {})
 
-    # The endpoint may return metrics under data.metric (same shape as /metric)
-    # or nested under data.user.metric — handle both.
     if isinstance(data, dict):
         metrics = (
             data.get("metric")
@@ -504,12 +489,10 @@ async def update_key_result(
     """
     metric_id = validate_metric_id(metric_id)
 
-    # Validate inputs via Pydantic
     validated = UpdateKeyResultInput(value=value, comment=comment)
 
     client = get_client()
 
-    # Read-back-before-write: fetch current value to detect significant decreases
     current_value: float | None = None
     metric_name: str = f"metric/{metric_id}"
     try:
@@ -521,12 +504,10 @@ async def update_key_result(
                 metric_name = m.get("metric_name", metric_name)
                 break
     except Exception:
-        # Don't block the update if read-back fails
         logger.warning("Could not read current value for metric %d", metric_id)
 
     new_value = float(validated.value)
 
-    # Warn on decrease but allow it (the audit log captures it)
     warning: str | None = None
     if current_value is not None and new_value < current_value:
         warning = (
@@ -580,7 +561,6 @@ async def create_objective(
     Returns:
         Created objective details
     """
-    # Validate inputs via Pydantic
     validated = CreateObjectiveInput(
         name=name,
         owner=owner,

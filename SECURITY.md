@@ -1,7 +1,7 @@
 # Security: mcp-workboard-crunchtools
 
-**Last updated:** 2026-02-24
-**Version:** 0.4.0
+**Last updated:** 2026-02-27
+**Version:** 0.6.0
 
 ## What This Server Can and Cannot Do
 
@@ -33,7 +33,7 @@ This MCP server gives AI agents read/write access to your WorkBoard OKRs. Before
 
 ## Tools and Their Risk Levels
 
-Of the 10 tools, 7 are read-only and low-risk. The 3 write tools are where the risk lives:
+Of the 13 tools, 10 are read-only and low-risk. The 3 write tools are where the risk lives:
 
 | Tool | What It Does | Risk | Why |
 |------|-------------|------|-----|
@@ -41,7 +41,7 @@ Of the 10 tools, 7 are read-only and low-risk. The 3 write tools are where the r
 | **create_objective** | Creates new objectives | Medium | Requires Data-Admin token |
 | **create_user** | Creates new WorkBoard users | Medium | Requires Data-Admin token |
 
-The remaining tools (`get_user`, `list_users`, `update_user`, `get_objectives`, `get_objective_details`, `get_my_objectives`, `get_my_key_results`) are read-only or low-impact updates.
+The remaining tools (`get_user`, `list_users`, `update_user`, `get_teams`, `get_team_members`, `get_objectives`, `get_objective_details`, `get_my_objectives`, `get_my_key_results`, `get_user_key_results`) are read-only or low-impact updates.
 
 ## How Write Operations Are Protected
 
@@ -135,7 +135,7 @@ The server uses six layers of protection:
 
 ## Reporting Security Issues
 
-Report security issues to security@crunchtools.com or open a private security advisory on GitHub.
+Report security issues via [GitHub private security advisory](https://github.com/crunchtools/mcp-workboard/security/advisories/new) or email security@crunchtools.com.
 
 Do NOT open public issues for security vulnerabilities.
 

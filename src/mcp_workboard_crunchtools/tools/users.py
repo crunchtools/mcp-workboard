@@ -62,7 +62,6 @@ async def create_user(
     Returns:
         Created user details
     """
-    # Validate input using Pydantic model
     user_input = CreateUserInput(
         first_name=first_name,
         last_name=last_name,
@@ -107,7 +106,6 @@ async def update_user(
     """
     user_id = validate_user_id(user_id)
 
-    # Validate input using Pydantic model
     update_input = UpdateUserInput(
         first_name=first_name,
         last_name=last_name,

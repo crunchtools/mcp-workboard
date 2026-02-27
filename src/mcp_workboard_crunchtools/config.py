@@ -1,8 +1,4 @@
-"""Secure configuration handling.
-
-This module handles all configuration including the sensitive API token.
-The token is stored as a SecretStr to prevent accidental logging.
-"""
+"""Secure configuration handling."""
 
 import logging
 import os
@@ -62,7 +58,7 @@ class Config:
         return "Config(token=***)"
 
 
-# Global configuration instance
+
 _config: Config | None = None
 
 

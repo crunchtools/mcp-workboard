@@ -1,0 +1,53 @@
+# Gourmand Exceptions
+# Documented exceptions for files that legitimately trigger checks
+
+# Summary litter — CLAUDE.md is a standard Claude Code project instructions file
+[[exceptions]]
+check = "summary_litter"
+path = "CLAUDE.md"
+justification = "Claude Code project instructions for AI assistant orientation"
+
+# Lint suppression — test intentionally passes invalid args to verify rejection
+[[exceptions]]
+check = "lint_suppression"
+path = "tests/test_validation.py"
+justification = "type: ignore[call-arg] is required to test that Pydantic rejects extra fields"
+
+# Lint suppression — test mocked side_effect needs no-untyped-def
+[[exceptions]]
+check = "lint_suppression"
+path = "tests/test_tools.py"
+justification = "type: ignore[no-untyped-def] on mock side_effect closures that cannot carry type annotations"
+
+# Primitive obsession — HTTP status codes and response size limit are standard API patterns
+[[exceptions]]
+check = "primitive_obsession"
+path = "src/mcp_workboard_crunchtools/client.py"
+justification = "HTTP status codes (401, 403, 404, 429) and response size limit (10MB) are standard well-known constants"
+
+# Primitive obsession — port 8000 is a standard default for HTTP servers
+[[exceptions]]
+check = "primitive_obsession"
+path = "src/mcp_workboard_crunchtools/__init__.py"
+justification = "Port 8000 is a standard default for HTTP servers"
+
+# Implicit state machine — optional parameter builders are not state machines
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_workboard_crunchtools/tools/users.py"
+justification = "Optional API parameter builders use simple if-guards to add body fields, not state machines"
+
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_workboard_crunchtools/tools/objectives.py"
+justification = "Optional API parameter builders and response format normalization, not state machines"
+
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_workboard_crunchtools/tools/teams.py"
+justification = "Response shape normalization handling dict vs list API responses, not state machines"
+
+[[exceptions]]
+check = "implicit_state_machine"
+path = "src/mcp_workboard_crunchtools/client.py"
+justification = "Error handling dispatches on HTTP status codes — standard pattern, not a state machine"
