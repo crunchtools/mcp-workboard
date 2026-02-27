@@ -1,16 +1,17 @@
-"""Pydantic models for input validation.
-
-All tool inputs are validated through these models to prevent injection attacks
-and ensure data integrity before making API calls.
-
-WorkBoard IDs are positive integers (not hex strings like Cloudflare).
-"""
+"""Pydantic models for input validation."""
 
 import re
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from .errors import InvalidMetricIdError, InvalidObjectiveIdError, InvalidUserIdError
+
+MAX_NAME_LENGTH = 255
+MAX_OBJECTIVE_NAME_LENGTH = 500
+MAX_VALUE_LENGTH = 20
+MAX_COMMENT_LENGTH = 1000
+MAX_NARRATIVE_LENGTH = 2000
+MAX_PERMISSION_LENGTH = 100
 
 
 def validate_user_id(user_id: int) -> int:
@@ -40,16 +41,16 @@ class CreateUserInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     first_name: str = Field(
-        ..., min_length=1, max_length=255, description="User's first name"
+        ..., min_length=1, max_length=MAX_NAME_LENGTH, description="User's first name"
     )
     last_name: str = Field(
-        ..., min_length=1, max_length=255, description="User's last name"
+        ..., min_length=1, max_length=MAX_NAME_LENGTH, description="User's last name"
     )
     email: EmailStr = Field(
         ..., description="User's email address"
     )
     designation: str | None = Field(
-        default=None, max_length=255, description="User's job title or designation"
+        default=None, max_length=MAX_NAME_LENGTH, description="User's job title or designation"
     )
 
 
@@ -62,20 +63,19 @@ class UpdateUserInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     first_name: str | None = Field(
-        default=None, min_length=1, max_length=255, description="User's first name"
+        default=None, min_length=1, max_length=MAX_NAME_LENGTH, description="User's first name"
     )
     last_name: str | None = Field(
-        default=None, min_length=1, max_length=255, description="User's last name"
+        default=None, min_length=1, max_length=MAX_NAME_LENGTH, description="User's last name"
     )
     email: EmailStr | None = Field(
         default=None, description="User's email address"
     )
     designation: str | None = Field(
-        default=None, max_length=255, description="User's job title or designation"
+        default=None, max_length=MAX_NAME_LENGTH, description="User's job title or designation"
     )
 
 
-# Date format pattern for YYYY-MM-DD
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -88,10 +88,11 @@ class UpdateKeyResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     value: str = Field(
-        ..., min_length=1, max_length=20, description="Progress value (non-negative number)"
+        ..., min_length=1, max_length=MAX_VALUE_LENGTH,
+        description="Progress value (non-negative number)",
     )
     comment: str | None = Field(
-        default=None, max_length=1000, description="Optional check-in comment"
+        default=None, max_length=MAX_COMMENT_LENGTH, description="Optional check-in comment"
     )
 
     @field_validator("value")
@@ -116,10 +117,10 @@ class CreateObjectiveInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(
-        ..., min_length=1, max_length=500, description="Objective name"
+        ..., min_length=1, max_length=MAX_OBJECTIVE_NAME_LENGTH, description="Objective name"
     )
     owner: str = Field(
-        ..., min_length=1, max_length=255, description="Owner email or user ID"
+        ..., min_length=1, max_length=MAX_NAME_LENGTH, description="Owner email or user ID"
     )
     start_date: str = Field(
         ..., description="Start date in YYYY-MM-DD format"
@@ -128,13 +129,14 @@ class CreateObjectiveInput(BaseModel):
         ..., description="Target date in YYYY-MM-DD format"
     )
     narrative: str | None = Field(
-        default=None, max_length=2000, description="Objective description"
+        default=None, max_length=MAX_NARRATIVE_LENGTH, description="Objective description"
     )
     goal_type: str = Field(
         default="1", description="1=Team, 2=Personal"
     )
     permission: str = Field(
-        default="internal,team", max_length=100, description="Visibility setting"
+        default="internal,team", max_length=MAX_PERMISSION_LENGTH,
+        description="Visibility setting",
     )
 
     @field_validator("start_date", "target_date")

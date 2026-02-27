@@ -44,11 +44,18 @@ class InvalidMetricIdError(UserError):
         super().__init__("Invalid metric_id format. Expected positive integer.")
 
 
+SAFE_ID_MAX_LENGTH = 20
+
+
 class NotFoundError(UserError):
     """Resource not found or not accessible."""
 
     def __init__(self, resource: str, identifier: str) -> None:
-        safe_id = identifier[:20] + "..." if len(identifier) > 20 else identifier
+        safe_id = (
+            identifier[:SAFE_ID_MAX_LENGTH] + "..."
+            if len(identifier) > SAFE_ID_MAX_LENGTH
+            else identifier
+        )
         super().__init__(f"{resource} not found or not accessible: {safe_id}")
 
 

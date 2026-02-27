@@ -1,7 +1,4 @@
-"""FastMCP server setup for WorkBoard MCP.
-
-This module creates and configures the MCP server with all tools.
-"""
+"""FastMCP server setup for WorkBoard MCP."""
 
 import logging
 from typing import Any
@@ -26,7 +23,6 @@ from .tools import (
 
 logger = logging.getLogger(__name__)
 
-# Create the FastMCP server
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
     version="0.6.0",
@@ -49,9 +45,6 @@ mcp = FastMCP(
         "and target date."
     ),
 )
-
-
-# Register User tools
 
 
 @mcp.tool()
@@ -135,8 +128,6 @@ async def workboard_update_user_tool(
     )
 
 
-# Register Team tools
-
 
 @mcp.tool()
 async def workboard_get_teams_tool() -> dict[str, Any]:
@@ -166,8 +157,6 @@ async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
     """
     return await get_team_members(team_id=team_id)
 
-
-# Register Objective tools
 
 
 @mcp.tool()
@@ -234,8 +223,6 @@ async def workboard_get_my_objectives_tool(
     """
     return await get_my_objectives(objective_ids=objective_ids)
 
-
-# Register Key Result tools
 
 
 @mcp.tool()
