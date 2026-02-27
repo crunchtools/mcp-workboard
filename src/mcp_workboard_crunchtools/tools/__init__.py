@@ -11,6 +11,7 @@ from .objectives import (
     get_objectives,
     update_key_result,
 )
+from .teams import get_team_members, get_teams
 from .users import create_user, get_user, list_users, update_user
 
 __all__ = [
@@ -19,6 +20,9 @@ __all__ = [
     "list_users",
     "create_user",
     "update_user",
+    # Teams
+    "get_teams",
+    "get_team_members",
     # Objectives
     "get_objectives",
     "get_objective_details",
