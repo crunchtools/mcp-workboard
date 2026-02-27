@@ -4,6 +4,7 @@ Tools for retrieving and managing WorkBoard objectives (goals) and their key res
 WorkBoard uses "goal" in its API, but these tools expose OKR terminology.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -37,8 +38,18 @@ def _format_date(timestamp: str | int | None) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
-def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
-    """Format a key result metric for human-readable output."""
+def _format_metric(
+    metric: dict[str, Any],
+    target_date_override: str | None = None,
+) -> dict[str, Any]:
+    """Format a key result metric for human-readable output.
+
+    Args:
+        metric: Raw metric dict from WorkBoard API
+        target_date_override: Real target date (YYYY-MM-DD) to use instead of the
+            value embedded in the nested metric object, which is often absent when
+            metrics are returned as part of a goal response.
+    """
     unit = metric.get("metric_unit", {})
     unit_name = unit.get("name", "") if isinstance(unit, dict) else ""
 
@@ -62,7 +73,7 @@ def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
         "metric_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
-        "target_date": _format_date(metric.get("target_date")),
+        "target_date": target_date_override or _format_date(metric.get("target_date")),
     }
 
     # Expose last check-in date. metric_last_update is 0 when never checked in.
@@ -77,8 +88,18 @@ def _format_metric(metric: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
-    """Format an objective for human-readable output."""
+def _format_goal(
+    goal: dict[str, Any],
+    metric_target_dates: dict[int, str] | None = None,
+) -> dict[str, Any]:
+    """Format an objective for human-readable output.
+
+    Args:
+        goal: Raw goal dict from WorkBoard API
+        metric_target_dates: Optional {metric_id: "YYYY-MM-DD"} lookup built from
+            the /metric endpoint. When provided, used to populate target_date on
+            nested key results, which the goal response leaves empty.
+    """
     try:
         progress = int(float(goal.get("goal_progress") or 0))
     except (ValueError, TypeError):
@@ -112,7 +133,17 @@ def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
 
     metrics = goal.get("goal_metrics", [])
     if metrics:
-        result["key_results"] = [_format_metric(m) for m in metrics]
+        result["key_results"] = [
+            _format_metric(
+                m,
+                target_date_override=(
+                    metric_target_dates.get(int(m.get("metric_id", 0)))
+                    if metric_target_dates
+                    else None
+                ),
+            )
+            for m in metrics
+        ]
 
     return result
 
@@ -179,10 +210,15 @@ async def get_objectives(
     user_id = validate_user_id(user_id)
     client = get_client()
 
-    response = await client.get(f"/user/{user_id}/goal")
+    response, metric_target_dates = await asyncio.gather(
+        client.get(f"/user/{user_id}/goal"),
+        _fetch_target_date_map(client),
+    )
 
     goals, goal_count = _extract_goals_from_response(response)
-    result: dict[str, Any] = {"objectives": [_format_goal(g) for g in goals]}
+    result: dict[str, Any] = {
+        "objectives": [_format_goal(g, metric_target_dates) for g in goals]
+    }
     if goal_count > len(goals):
         result["warning"] = (
             f"Showing {len(goals)} of {goal_count} objectives (API cap). "
@@ -208,42 +244,59 @@ async def get_objective_details(
     objective_id = validate_objective_id(objective_id)
     client = get_client()
 
-    response = await client.get(f"/user/{user_id}/goal/{objective_id}")
+    response, metric_target_dates = await asyncio.gather(
+        client.get(f"/user/{user_id}/goal/{objective_id}"),
+        _fetch_target_date_map(client),
+    )
 
     # Detail endpoint: data.user.goal is a single goal dict
     goal = response.get("data", {}).get("user", {}).get("goal", {})
     if isinstance(goal, dict) and goal:
-        return {"objective": _format_goal(goal)}
+        return {"objective": _format_goal(goal, metric_target_dates)}
 
     return {"objective": response}
 
 
-async def _get_objective_ids_from_metrics(client: Any) -> list[int]:
-    """Discover objective IDs by fetching all metrics and extracting parent goal IDs.
+async def _get_objective_ids_from_metrics(
+    client: Any,
+) -> tuple[list[int], dict[int, str]]:
+    """Discover objective IDs and build a target-date lookup from the /metric endpoint.
 
-    The /metric endpoint returns all key results the user has access to.
-    Each metric contains a goal_id linking it to its parent objective.
-    This bypasses the 15-result cap on the /user/{id}/goal list endpoint.
+    The /metric endpoint returns all key results the user has access to. Each metric
+    contains a goal_id linking it to its parent objective and a real target_date that
+    is absent from nested metric objects within goal responses.
 
     Returns:
-        Sorted list of unique objective IDs from current-year metrics
+        Tuple of:
+        - Sorted list of unique objective IDs from current-year metrics
+        - Dict mapping metric_id → "YYYY-MM-DD" target date for all fetched metrics
     """
     response = await client.get("/metric")
 
     data = response.get("data", {})
-    metrics = data.get("metric", []) if isinstance(data, dict) else []
+    all_metrics = data.get("metric", []) if isinstance(data, dict) else []
 
-    # Filter to current year
+    # Build target-date lookup from ALL metrics (not just current year)
+    # so that goal enrichment works for any objective we fetch.
+    target_date_map: dict[int, str] = {}
+    for m in all_metrics:
+        mid = m.get("metric_id")
+        if mid is not None:
+            try:
+                target_date_map[int(mid)] = _format_date(m.get("target_date"))
+            except (ValueError, TypeError):
+                continue
+
+    # Filter to current year for ID discovery only
     year_start = _current_year_start()
-    metrics = [
-        m for m in metrics
+    current_year_metrics = [
+        m for m in all_metrics
         if int(m.get("target_date") or 0) >= year_start
     ]
 
-    # Extract unique goal IDs from metrics
+    # Extract unique goal IDs from current-year metrics
     goal_ids: set[int] = set()
-    for m in metrics:
-        # WorkBoard uses "metric_goal_id" to reference the parent objective
+    for m in current_year_metrics:
         gid = m.get("metric_goal_id")
         if gid is not None:
             try:
@@ -251,7 +304,28 @@ async def _get_objective_ids_from_metrics(client: Any) -> list[int]:
             except (ValueError, TypeError):
                 continue
 
-    return sorted(goal_ids)
+    return sorted(goal_ids), target_date_map
+
+
+async def _fetch_target_date_map(client: Any) -> dict[int, str]:
+    """Fetch the /metric endpoint and return a {metric_id: target_date} lookup.
+
+    Used to enrich nested key results within objectives. Fails gracefully —
+    callers receive an empty dict when the fetch fails, which means nested KRs
+    will have empty target_date strings rather than raising an error.
+    """
+    try:
+        response = await client.get("/metric")
+        data = response.get("data", {})
+        metrics = data.get("metric", []) if isinstance(data, dict) else []
+        return {
+            int(m["metric_id"]): _format_date(m.get("target_date"))
+            for m in metrics
+            if m.get("metric_id") is not None
+        }
+    except Exception:
+        logger.warning("Could not fetch metric target dates for enrichment")
+        return {}
 
 
 async def get_my_objectives(
@@ -280,9 +354,11 @@ async def get_my_objectives(
     except (KeyError, TypeError, ValueError):
         return {"error": "Could not determine current user ID"}
 
-    # Auto-discover objective IDs from metrics if none provided
+    # Auto-discover objective IDs from metrics if none provided.
+    # Also builds the target-date map in the same fetch for KR enrichment.
+    metric_target_dates: dict[int, str] = {}
     if objective_ids is None:
-        objective_ids = await _get_objective_ids_from_metrics(client)
+        objective_ids, metric_target_dates = await _get_objective_ids_from_metrics(client)
         if not objective_ids:
             return {
                 "objectives": [],
@@ -291,6 +367,9 @@ async def get_my_objectives(
                     "that link to objectives. You can provide objective IDs explicitly."
                 ),
             }
+    else:
+        # Explicit IDs provided — still fetch target dates for enrichment
+        metric_target_dates = await _fetch_target_date_map(client)
 
     # Fetch each objective by ID (handles archived gracefully)
     objectives: list[dict[str, Any]] = []
@@ -301,7 +380,7 @@ async def get_my_objectives(
             detail = await client.get(f"/user/{user_id}/goal/{validated_oid}")
             goal = detail.get("data", {}).get("user", {}).get("goal", {})
             if isinstance(goal, dict) and goal:
-                objectives.append(_format_goal(goal))
+                objectives.append(_format_goal(goal, metric_target_dates))
             else:
                 objectives.append(detail)
         except UserError:
