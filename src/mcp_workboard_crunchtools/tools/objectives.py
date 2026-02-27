@@ -94,6 +94,13 @@ def _format_goal(goal: dict[str, Any]) -> dict[str, Any]:
     if owner:
         result["owner"] = owner
 
+    owner_id = goal.get("goal_owner")
+    if owner_id:
+        try:
+            result["owner_id"] = int(owner_id)
+        except (ValueError, TypeError):
+            pass
+
     team = goal.get("goal_team_name")
     if team:
         result["team"] = team

@@ -15,6 +15,8 @@ from .tools import (
     get_my_objectives,
     get_objective_details,
     get_objectives,
+    get_team_members,
+    get_teams,
     get_user,
     list_users,
     update_key_result,
@@ -130,6 +132,38 @@ async def workboard_update_user_tool(
         email=email,
         designation=designation,
     )
+
+
+# Register Team tools
+
+
+@mcp.tool()
+async def workboard_get_teams_tool() -> dict[str, Any]:
+    """Get all teams the authenticated user belongs to.
+
+    Returns team IDs, names, and owner user IDs. Use workboard_get_team_members_tool
+    to get the full member list (with user_ids) for a specific team.
+
+    Returns:
+        List of teams with team_id, team_name, team_owner_id, is_team_owner
+    """
+    return await get_teams()
+
+
+@mcp.tool()
+async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
+    """Get all members of a WorkBoard team, including their user IDs and emails.
+
+    Use this to resolve a person's name or email to their WorkBoard user_id.
+    Combine with workboard_get_objectives_tool(user_id) to fetch their OKRs.
+
+    Args:
+        team_id: The WorkBoard team ID (get from workboard_get_teams_tool)
+
+    Returns:
+        team_id, team_name, and members list with user_id, full_name, email, team_role
+    """
+    return await get_team_members(team_id=team_id)
 
 
 # Register Objective tools
