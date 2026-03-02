@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.crunchtools/workboard",
+  "title": "MCP Workboard",
+  "description": "Secure MCP server for WorkBoard OKR and strategy execution platform",
+  "repository": {
+    "url": "https://github.com/crunchtools/mcp-workboard",
+    "source": "github"
+  },
+  "version": "0.6.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "mcp-workboard-crunchtools",
+      "version": "0.6.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
