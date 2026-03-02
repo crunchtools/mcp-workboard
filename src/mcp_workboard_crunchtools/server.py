@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     name="mcp-workboard-crunchtools",
-    version="0.6.0",
+    version="0.6.1",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
