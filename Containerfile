@@ -23,7 +23,10 @@ LABEL name="mcp-workboard-crunchtools" \
       maintainer="crunchtools.com" \
       url="https://github.com/crunchtools/mcp-workboard" \
       io.k8s.display-name="MCP WorkBoard CrunchTools" \
-      io.openshift.tags="mcp,workboard,okr"
+      io.openshift.tags="mcp,workboard,okr" \
+      org.opencontainers.image.source="https://github.com/crunchtools/mcp-workboard" \
+      org.opencontainers.image.description="Secure MCP server for WorkBoard OKR and strategy execution" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 # Set working directory
 WORKDIR /app
