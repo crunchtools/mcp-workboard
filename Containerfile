@@ -17,7 +17,7 @@ FROM quay.io/hummingbird/python:latest
 
 # Labels for container metadata
 LABEL name="mcp-workboard-crunchtools" \
-      version="0.1.0" \
+      version="0.6.1" \
       summary="Secure MCP server for WorkBoard OKR and strategy execution" \
       description="A security-focused MCP server for WorkBoard built on Red Hat UBI" \
       maintainer="crunchtools.com" \
