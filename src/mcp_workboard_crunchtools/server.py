@@ -24,7 +24,7 @@ from .tools import (
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
-    name="mcp-workboard-crunchtools",
+    name="mcp-workboard",
     version="0.6.1",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
