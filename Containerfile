@@ -8,7 +8,7 @@
 #   podman run -e WORKBOARD_API_TOKEN=your_token quay.io/crunchtools/mcp-workboard
 #
 # With Claude Code:
-#   claude mcp add mcp-workboard-crunchtools \
+#   claude mcp add mcp-workboard \
 #     --env WORKBOARD_API_TOKEN=your_token \
 #     -- podman run -i --rm -e WORKBOARD_API_TOKEN quay.io/crunchtools/mcp-workboard
 
