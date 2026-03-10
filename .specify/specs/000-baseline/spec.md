@@ -2,17 +2,17 @@
 
 > **Spec ID:** 000-baseline
 > **Status:** Implemented
-> **Version:** 0.6.0
+> **Version:** 0.7.0
 > **Author:** crunchtools.com
 > **Date:** 2026-02-27
 
 ## Overview
 
-Baseline specification for mcp-workboard-crunchtools v0.6.0, documenting all 13 tools across 4 categories that provide secure access to the WorkBoard OKR and strategy execution platform API.
+Baseline specification for mcp-workboard-crunchtools v0.7.0, documenting all 18 tools across 5 categories that provide secure access to the WorkBoard OKR and strategy execution platform API.
 
 ---
 
-## Tools (13)
+## Tools (18)
 
 ### User Tools (4)
 
@@ -47,6 +47,16 @@ Baseline specification for mcp-workboard-crunchtools v0.6.0, documenting all 13 
 | `get_user_key_results` | GET | `/user/{id}/metric` | List key results for a specific user |
 | `update_key_result` | PUT | `/metric/{id}` | Update key result progress (weekly check-ins) |
 
+### Workstream Tools (5)
+
+| Tool | Method | Endpoint | Description |
+|------|--------|----------|-------------|
+| `get_workstreams` | GET | `/workstream` | Get team workstreams accessible to the authenticated user |
+| `get_workstream_activities` | GET | `/workstream/{id}/activity` | Get workstream details with all action items |
+| `get_team_workstreams` | GET | `/team/{id}/workstream` | Get all workstreams belonging to a specific team |
+| `create_workstream` | POST | `/workstream` | Create a new workstream for a team |
+| `update_workstream` | PUT | `/workstream/{id}` | Update workstream properties (name, dates, pace, health, priority) |
+
 ---
 
 ## Environment Variables
@@ -65,6 +75,7 @@ UserError
 ├── InvalidUserIdError
 ├── InvalidObjectiveIdError
 ├── InvalidMetricIdError
+├── InvalidWorkstreamIdError
 ├── NotFoundError
 ├── PermissionDeniedError
 ├── RateLimitError
@@ -86,12 +97,15 @@ src/mcp_workboard_crunchtools/
 ├── errors.py            # UserError hierarchy
 ├── models.py            # Pydantic input validation models
 └── tools/
-    ├── __init__.py      # Re-exports all 13 tool functions
+    ├── __init__.py      # Re-exports all 18 tool functions
     ├── users.py         # get_user, list_users, create_user, update_user
     ├── teams.py         # get_teams, get_team_members
-    └── objectives.py    # get_objectives, get_objective_details, get_my_objectives,
-                         # get_my_key_results, get_user_key_results,
-                         # update_key_result, create_objective
+    ├── objectives.py    # get_objectives, get_objective_details, get_my_objectives,
+    │                    # get_my_key_results, get_user_key_results,
+    │                    # update_key_result, create_objective
+    └── workstreams.py   # get_workstreams, get_workstream_activities,
+                         # get_team_workstreams, create_workstream,
+                         # update_workstream
 ```
 
 ---
@@ -100,8 +114,8 @@ src/mcp_workboard_crunchtools/
 
 | Test File | Tests | What It Covers |
 |-----------|------:|----------------|
-| `test_tools.py` | 25 | Registration, imports, tool count, error safety, config safety, mocked API (users, teams, objectives, key results), error handling (401, 403, 429) |
-| `test_validation.py` | 20 | User ID, objective ID, metric ID validation; CreateUserInput, UpdateUserInput Pydantic models |
+| `test_tools.py` | 31 | Registration, imports, tool count, error safety, config safety, mocked API (users, teams, objectives, key results, workstreams), error handling (401, 403, 429) |
+| `test_validation.py` | 40 | User ID, objective ID, metric ID, workstream ID validation; CreateUserInput, UpdateUserInput, CreateWorkstreamInput, UpdateWorkstreamInput Pydantic models |
 
 ---
 
@@ -109,6 +123,7 @@ src/mcp_workboard_crunchtools/
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.7.0 | 2026-03-10 | Added workstream tools (get, get activities, get by team, create, update) |
 | 0.6.0 | 2026-02-27 | Added team tools, per-user key results, target_date enrichment, gourmand compliance, spec-kit |
 | 0.5.0 | 2026-02-26 | Added get_user_key_results, get_my_objectives auto-discovery |
 | 0.4.0 | 2026-02-24 | Added Pydantic validation, decrease detection, audit logging |

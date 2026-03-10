@@ -21,10 +21,10 @@ class TestToolRegistration:
         assert mcp is not None
 
     def test_tool_count(self) -> None:
-        """Server should have exactly 13 tools registered."""
+        """Server should have exactly 18 tools registered."""
         from mcp_workboard_crunchtools.tools import __all__
 
-        assert len(__all__) == 13
+        assert len(__all__) == 18
 
     def test_imports(self) -> None:
         """All tool functions should be importable."""
@@ -72,6 +72,7 @@ class TestErrorSafety:
             InvalidMetricIdError,
             InvalidObjectiveIdError,
             InvalidUserIdError,
+            InvalidWorkstreamIdError,
             NotFoundError,
             PermissionDeniedError,
             RateLimitError,
@@ -84,6 +85,7 @@ class TestErrorSafety:
         assert issubclass(InvalidUserIdError, UserError)
         assert issubclass(InvalidObjectiveIdError, UserError)
         assert issubclass(InvalidMetricIdError, UserError)
+        assert issubclass(InvalidWorkstreamIdError, UserError)
         assert issubclass(NotFoundError, UserError)
         assert issubclass(PermissionDeniedError, UserError)
         assert issubclass(RateLimitError, UserError)
@@ -509,6 +511,270 @@ class TestKeyResultTools:
             result = await update_key_result(metric_id=10, value="75")
 
         assert "key_result" in result
+
+
+class TestWorkstreamTools:
+    """Tests for workstream tools with mocked API responses."""
+
+    @pytest.mark.asyncio
+    async def test_get_workstreams(self) -> None:
+        """get_workstreams should return formatted workstream list."""
+        from mcp_workboard_crunchtools.tools import get_workstreams
+
+        resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": [
+                    {
+                        "ws_id": "100",
+                        "ws_name": "Q1 Sprint",
+                        "ws_objective": "Ship features",
+                        "ws_owner": "42",
+                        "ws_lead": "43",
+                        "ws_status": "active",
+                        "ws_type": "team",
+                        "ws_pace": "steady",
+                        "ws_health": "good",
+                        "ws_priority": "p1",
+                        "ws_progress": "50",
+                        "ws_start_date": "2026-01-01",
+                        "ws_target_date": "2026-03-31",
+                        "ws_completion_date": None,
+                        "ws_team_id": "10",
+                        "ws_team_name": "Engineering",
+                    },
+                ],
+            },
+        })
+
+        with _patch_client(resp):
+            result = await get_workstreams()
+
+        assert "workstreams" in result
+        assert len(result["workstreams"]) == 1
+        assert result["workstreams"][0]["name"] == "Q1 Sprint"
+        assert result["workstreams"][0]["health"] == "good"
+
+    @pytest.mark.asyncio
+    async def test_get_workstreams_by_id(self) -> None:
+        """get_workstreams with ws_id should return a single workstream."""
+        from mcp_workboard_crunchtools.tools import get_workstreams
+
+        resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": {
+                    "ws_id": "100",
+                    "ws_name": "Q1 Sprint",
+                    "ws_objective": "Ship features",
+                    "ws_owner": "42",
+                    "ws_lead": "43",
+                    "ws_status": "active",
+                    "ws_type": "team",
+                    "ws_pace": "steady",
+                    "ws_health": "good",
+                    "ws_priority": "p1",
+                    "ws_progress": "50",
+                    "ws_start_date": "2026-01-01",
+                    "ws_target_date": "2026-03-31",
+                    "ws_completion_date": None,
+                    "ws_team_id": "10",
+                    "ws_team_name": "Engineering",
+                },
+            },
+        })
+
+        with _patch_client(resp):
+            result = await get_workstreams(ws_id=100)
+
+        assert "workstreams" in result
+        assert len(result["workstreams"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_workstream_activities(self) -> None:
+        """get_workstream_activities should return workstream with action items."""
+        from mcp_workboard_crunchtools.tools import get_workstream_activities
+
+        resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": {
+                    "ws_id": "100",
+                    "ws_name": "Q1 Sprint",
+                    "ws_objective": "Ship features",
+                    "ws_owner": "42",
+                    "ws_lead": "43",
+                    "ws_status": "active",
+                    "ws_type": "team",
+                    "ws_pace": "steady",
+                    "ws_health": "good",
+                    "ws_priority": "p1",
+                    "ws_progress": "50",
+                    "ws_start_date": "2026-01-01",
+                    "ws_target_date": "2026-03-31",
+                    "ws_completion_date": None,
+                    "ws_team_id": "10",
+                    "ws_team_name": "Engineering",
+                    "ws_activity": {
+                        "activity": [
+                            {
+                                "ai_id": "500",
+                                "ai_description": "Write design doc",
+                                "ai_state": "open",
+                                "ai_priority": "p1",
+                                "ai_effort": "medium",
+                                "ai_due_date": "2026-02-15",
+                                "ai_owner": "alice@example.com",
+                                "ai_created_by": "bob@example.com",
+                                "ai_created_at": "2026-01-10",
+                                "ai_completed_at": None,
+                                "ai_url": "https://workboard.com/ai/500",
+                                "ai_comments": [
+                                    {
+                                        "comment_id": "1",
+                                        "comment": "Started draft",
+                                        "comment_owner": "alice@example.com",
+                                        "comment_timestamp": "2026-01-12",
+                                    },
+                                ],
+                                "ai_sub_actions": [],
+                                "ai_files": [],
+                            },
+                        ],
+                        "activity_count": 1,
+                    },
+                },
+            },
+        })
+
+        with _patch_client(resp):
+            result = await get_workstream_activities(ws_id=100)
+
+        assert "workstream" in result
+        ws = result["workstream"]
+        assert ws["name"] == "Q1 Sprint"
+        assert "action_items" in ws
+        assert len(ws["action_items"]) == 1
+        assert ws["action_items"][0]["description"] == "Write design doc"
+        assert len(ws["action_items"][0]["comments"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_team_workstreams(self) -> None:
+        """get_team_workstreams should return workstreams for a team."""
+        from mcp_workboard_crunchtools.tools import get_team_workstreams
+
+        resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "team": {
+                    "team_id": "10",
+                    "team_name": "Engineering",
+                    "team_workstream": {
+                        "workstream_count": "1",
+                        "workstream": [
+                            {
+                                "ws_id": "100",
+                                "ws_name": "Q1 Sprint",
+                                "ws_objective": "Ship features",
+                                "ws_owner": "42",
+                                "ws_lead": "43",
+                                "ws_status": "active",
+                                "ws_type": "team",
+                                "ws_pace": "steady",
+                                "ws_health": "good",
+                                "ws_priority": "p1",
+                                "ws_progress": "50",
+                                "ws_start_date": "2026-01-01",
+                                "ws_target_date": "2026-03-31",
+                                "ws_completion_date": None,
+                                "ws_team_id": "10",
+                                "ws_team_name": "Engineering",
+                            },
+                        ],
+                    },
+                },
+            },
+        })
+
+        with _patch_client(resp):
+            result = await get_team_workstreams(team_id=10)
+
+        assert result["team_id"] == 10
+        assert result["team_name"] == "Engineering"
+        assert len(result["workstreams"]) == 1
+        assert result["workstreams"][0]["name"] == "Q1 Sprint"
+
+    @pytest.mark.asyncio
+    async def test_create_workstream(self) -> None:
+        """create_workstream should post and return created workstream."""
+        from mcp_workboard_crunchtools.tools import create_workstream
+
+        resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": [{"ws_id": "200", "ws_name": "New WS"}],
+            },
+        })
+
+        with _patch_client(resp):
+            result = await create_workstream(
+                ws_name="New WS",
+                team_id="10",
+                ws_owner="42",
+                ws_objective="A new workstream",
+            )
+
+        assert "workstream" in result
+
+    @pytest.mark.asyncio
+    async def test_update_workstream(self) -> None:
+        """update_workstream should read then put and return updated workstream."""
+        from mcp_workboard_crunchtools.tools import update_workstream
+
+        read_resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": {
+                    "ws_id": "100",
+                    "ws_name": "Q1 Sprint",
+                    "ws_health": "good",
+                },
+            },
+        })
+        update_resp = _mock_response(json_data={
+            "data": {
+                "totalCount": 1,
+                "workstream": {
+                    "ws_id": "100",
+                    "ws_name": "Q1 Sprint",
+                    "ws_health": "risk",
+                },
+            },
+        })
+
+        import os
+
+        import mcp_workboard_crunchtools.client as client_mod
+        import mcp_workboard_crunchtools.config as config_mod
+
+        client_mod._client = None
+        config_mod._config = None
+        os.environ.setdefault("WORKBOARD_API_TOKEN", "test-mock-token")
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+
+        async def side_effect(**kwargs):  # type: ignore[no-untyped-def]
+            method = kwargs.get("method", "GET")
+            if method == "PUT":
+                return update_resp
+            return read_resp
+
+        mock_http.request = AsyncMock(side_effect=side_effect)
+
+        with patch.object(httpx, "AsyncClient", return_value=mock_http):
+            result = await update_workstream(ws_id=100, ws_health="risk")
+
+        assert "workstream" in result
 
 
 class TestClientErrorHandling:

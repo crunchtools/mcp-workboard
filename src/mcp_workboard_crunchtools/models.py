@@ -4,7 +4,12 @@ import re
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from .errors import InvalidMetricIdError, InvalidObjectiveIdError, InvalidUserIdError
+from .errors import (
+    InvalidMetricIdError,
+    InvalidObjectiveIdError,
+    InvalidUserIdError,
+    InvalidWorkstreamIdError,
+)
 
 MAX_NAME_LENGTH = 255
 MAX_OBJECTIVE_NAME_LENGTH = 500
@@ -33,6 +38,13 @@ def validate_metric_id(metric_id: int) -> int:
     if not isinstance(metric_id, int) or metric_id <= 0:
         raise InvalidMetricIdError
     return metric_id
+
+
+def validate_workstream_id(workstream_id: int) -> int:
+    """Validate a workstream ID is a positive integer."""
+    if not isinstance(workstream_id, int) or workstream_id <= 0:
+        raise InvalidWorkstreamIdError
+    return workstream_id
 
 
 class CreateUserInput(BaseModel):
@@ -153,4 +165,94 @@ class CreateObjectiveInput(BaseModel):
         """Validate goal_type is 1 or 2."""
         if v not in ("1", "2"):
             raise ValueError(f"goal_type must be '1' (Team) or '2' (Personal), got: {v!r}")
+        return v
+
+
+MAX_WORKSTREAM_NAME_LENGTH = 500
+MAX_WORKSTREAM_OBJECTIVE_LENGTH = 2000
+
+_VALID_PACE = {"slow", "fast", "steady"}
+_VALID_HEALTH = {"ok", "good", "risk"}
+_VALID_PRIORITY = {"p1", "p2", "p3", "p4", "p5"}
+
+
+class CreateWorkstreamInput(BaseModel):
+    """Validated input for creating a new workstream."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ws_name: str = Field(
+        ..., min_length=1, max_length=MAX_WORKSTREAM_NAME_LENGTH,
+        description="Name of the workstream",
+    )
+    ws_objective: str | None = Field(
+        default=None, max_length=MAX_WORKSTREAM_OBJECTIVE_LENGTH,
+        description="Descriptive narrative or objective statement",
+    )
+    team_id: str = Field(
+        ..., min_length=1, description="Parent team ID",
+    )
+    ws_owner: str = Field(
+        ..., min_length=1, description="User ID of the team manager or co-manager",
+    )
+
+
+class UpdateWorkstreamInput(BaseModel):
+    """Validated input for updating an existing workstream.
+
+    All fields are optional — only provided fields will be sent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ws_name: str | None = Field(
+        default=None, min_length=1, max_length=MAX_WORKSTREAM_NAME_LENGTH,
+        description="Name of the workstream",
+    )
+    ws_start_date: str | None = Field(
+        default=None, description="Start date (YYYY-MM-DD)",
+    )
+    ws_end_date: str | None = Field(
+        default=None, description="End date (YYYY-MM-DD)",
+    )
+    ws_pace: str | None = Field(
+        default=None, description="Pace: slow, fast, or steady",
+    )
+    ws_health: str | None = Field(
+        default=None, description="Health: ok, good, or risk",
+    )
+    ws_priority: str | None = Field(
+        default=None, description="Priority: p1 through p5",
+    )
+
+    @field_validator("ws_start_date", "ws_end_date")
+    @classmethod
+    def date_must_be_valid_format(cls, v: str | None) -> str | None:
+        """Validate date is YYYY-MM-DD format when provided."""
+        if v is not None and not _DATE_RE.match(v):
+            raise ValueError(f"Date must be YYYY-MM-DD format, got: {v!r}")
+        return v
+
+    @field_validator("ws_pace")
+    @classmethod
+    def pace_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate pace is one of the allowed values."""
+        if v is not None and v not in _VALID_PACE:
+            raise ValueError(f"ws_pace must be one of {sorted(_VALID_PACE)}, got: {v!r}")
+        return v
+
+    @field_validator("ws_health")
+    @classmethod
+    def health_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate health is one of the allowed values."""
+        if v is not None and v not in _VALID_HEALTH:
+            raise ValueError(f"ws_health must be one of {sorted(_VALID_HEALTH)}, got: {v!r}")
+        return v
+
+    @field_validator("ws_priority")
+    @classmethod
+    def priority_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate priority is one of the allowed values."""
+        if v is not None and v not in _VALID_PRIORITY:
+            raise ValueError(f"ws_priority must be one of {sorted(_VALID_PRIORITY)}, got: {v!r}")
         return v
