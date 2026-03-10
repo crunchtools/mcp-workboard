@@ -1,7 +1,7 @@
 # mcp-workboard-crunchtools Constitution
 
-> **Version:** 1.1.0
-> **Ratified:** 2026-03-10
+> **Version:** 1.0.0
+> **Ratified:** 2026-02-27
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.0.0
 > **Profile:** MCP Server
@@ -99,8 +99,6 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/) strictly.
 - Governance files (.specify/)
 
 **Version bump happens at release time, not per-commit.** Multiple commits can accumulate between releases. The version in `pyproject.toml`, `server.py`, and `__init__.py` is bumped when cutting a release tag.
-
-**A GitHub Release MUST be created for every version bump.** The release tag triggers PyPI publishing and container image pushes. Without a GitHub Release, the code is merged but not distributed — violating the three-channel requirement above.
 
 ### 7. AI Code Quality
 
@@ -234,14 +232,6 @@ Every code change must pass through these gates in order:
 4. Add a `TestNewGroupTools` class in `tests/test_tools.py`
 5. Run all five quality gates
 
-### Cutting a Release
-
-1. Ensure the version in `pyproject.toml`, `server.py`, and `__init__.py` is bumped
-2. Merge all changes to `main`
-3. Create a GitHub Release with tag `v{VERSION}` (e.g., `v0.7.0`)
-4. The release tag automatically triggers PyPI publishing and container image pushes
-5. Verify all three distribution channels are live (uvx, pip, container)
-
 ---
 
 ## VIII. Governance
@@ -258,4 +248,3 @@ Every code change must pass through these gates in order:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-02-27 | Initial constitution |
-| 1.1.0 | 2026-03-10 | Added mandatory GitHub Release requirement and release workflow |
