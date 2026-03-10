@@ -44,6 +44,13 @@ class InvalidMetricIdError(UserError):
         super().__init__("Invalid metric_id format. Expected positive integer.")
 
 
+class InvalidWorkstreamIdError(UserError):
+    """Invalid workstream ID format."""
+
+    def __init__(self) -> None:
+        super().__init__("Invalid workstream_id format. Expected positive integer.")
+
+
 SAFE_ID_MAX_LENGTH = 20
 
 

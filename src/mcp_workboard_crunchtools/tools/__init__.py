@@ -14,6 +14,13 @@ from .objectives import (
 )
 from .teams import get_team_members, get_teams
 from .users import create_user, get_user, list_users, update_user
+from .workstreams import (
+    create_workstream,
+    get_team_workstreams,
+    get_workstream_activities,
+    get_workstreams,
+    update_workstream,
+)
 
 __all__ = [
     "get_user",
@@ -29,4 +36,9 @@ __all__ = [
     "get_user_key_results",
     "update_key_result",
     "create_objective",
+    "get_workstreams",
+    "get_workstream_activities",
+    "get_team_workstreams",
+    "create_workstream",
+    "update_workstream",
 ]

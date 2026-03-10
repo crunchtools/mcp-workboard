@@ -1,6 +1,6 @@
 # Claude Code Instructions
 
-Secure MCP server for WorkBoard OKR and strategy execution platform. 13 tools across 4 categories.
+Secure MCP server for WorkBoard OKR and strategy execution platform. 18 tools across 5 categories.
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ claude mcp add mcp-workboard \
 |----------|----------|---------|-------------|
 | `WORKBOARD_API_TOKEN` | Yes | — | WorkBoard JWT API token |
 
-## Available Tools (13)
+## Available Tools (18)
 
 | Category | Tools | Operations |
 |----------|------:|------------|
@@ -36,6 +36,7 @@ claude mcp add mcp-workboard \
 | Teams | 2 | get teams, get team members |
 | Objectives | 4 | get, get details, get my objectives, create |
 | Key Results | 3 | get mine, get by user, update |
+| Workstreams | 5 | get, get activities, get by team, create, update |
 
 Full tool inventory with API endpoints: `.specify/specs/000-baseline/spec.md`
 
@@ -53,6 +54,9 @@ Show me my teams
 Who is on team 5678?
 Show key results for user 99
 Create an objective called "Increase retention" owned by user@example.com
+Show me my workstreams
+Show me the action items for workstream 100
+Show workstreams for team 5678
 ```
 
 ## Development
@@ -61,7 +65,7 @@ Create an objective called "Increase retention" owned by user@example.com
 uv sync --all-extras          # Install dependencies
 uv run ruff check src tests   # Lint
 uv run mypy src               # Type check
-uv run pytest -v              # Tests (45 mocked)
+uv run pytest -v              # Tests (71 mocked)
 gourmand --full .             # AI slop detection (zero violations)
 ```
 

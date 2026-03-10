@@ -8,24 +8,29 @@ from fastmcp import FastMCP
 from .tools import (
     create_objective,
     create_user,
+    create_workstream,
     get_my_key_results,
     get_my_objectives,
     get_objective_details,
     get_objectives,
     get_team_members,
+    get_team_workstreams,
     get_teams,
     get_user,
     get_user_key_results,
+    get_workstream_activities,
+    get_workstreams,
     list_users,
     update_key_result,
     update_user,
+    update_workstream,
 )
 
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.6.1",
+    version="0.7.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -42,7 +47,10 @@ mcp = FastMCP(
         "  - Key Result 1: current of target\n"
         "  - Key Result 2: current of target\n"
         "For key result lists without objectives, use a flat bulleted list with name, progress, "
-        "and target date."
+        "and target date.\n\n"
+        "WORKSTREAMS: Use workboard_get_workstreams_tool to list accessible workstreams, "
+        "workboard_get_workstream_activities_tool to see action items for a workstream, "
+        "and workboard_get_team_workstreams_tool to see workstreams for a specific team."
     ),
 )
 
@@ -344,4 +352,125 @@ async def workboard_create_objective_tool(
         goal_type=goal_type,
         permission=permission,
         key_results=key_results,
+    )
+
+
+@mcp.tool()
+async def workboard_get_workstreams_tool(
+    ws_id: int | None = None,
+) -> dict[str, Any]:
+    """Get team workstreams accessible to the authenticated user.
+
+    Returns all team workstreams the user has access to. Personal workstreams
+    are not included. Optionally filter to a single workstream by ID.
+
+    Args:
+        ws_id: Optional workstream ID to fetch a specific workstream.
+
+    Returns:
+        List of workstreams with name, owner, health, pace, priority, and dates
+    """
+    return await get_workstreams(ws_id=ws_id)
+
+
+@mcp.tool()
+async def workboard_get_workstream_activities_tool(
+    ws_id: int,
+) -> dict[str, Any]:
+    """Get a workstream's full details including all action items.
+
+    Returns the workstream metadata plus every action item with descriptions,
+    owners, due dates, comments, sub-actions, and attached files.
+
+    Args:
+        ws_id: Workstream ID (positive integer)
+
+    Returns:
+        Workstream details with action items
+    """
+    return await get_workstream_activities(ws_id=ws_id)
+
+
+@mcp.tool()
+async def workboard_get_team_workstreams_tool(
+    team_id: int,
+) -> dict[str, Any]:
+    """Get all workstreams belonging to a specific team.
+
+    Use workboard_get_teams_tool to find team IDs first.
+
+    Args:
+        team_id: Team ID (positive integer)
+
+    Returns:
+        Team info with list of workstreams
+    """
+    return await get_team_workstreams(team_id=team_id)
+
+
+@mcp.tool()
+async def workboard_create_workstream_tool(
+    ws_name: str,
+    team_id: str,
+    ws_owner: str,
+    ws_objective: str | None = None,
+) -> dict[str, Any]:
+    """Create a new workstream for a team.
+
+    Requires team manager or co-manager permissions.
+
+    Args:
+        ws_name: Name of the workstream
+        team_id: Parent team ID
+        ws_owner: User ID of the team manager or co-manager
+        ws_objective: Optional descriptive narrative or objective statement
+
+    Returns:
+        Created workstream details
+    """
+    return await create_workstream(
+        ws_name=ws_name,
+        team_id=team_id,
+        ws_owner=ws_owner,
+        ws_objective=ws_objective,
+    )
+
+
+@mcp.tool()
+async def workboard_update_workstream_tool(
+    ws_id: int,
+    ws_name: str | None = None,
+    ws_start_date: str | None = None,
+    ws_end_date: str | None = None,
+    ws_pace: str | None = None,
+    ws_health: str | None = None,
+    ws_priority: str | None = None,
+) -> dict[str, Any]:
+    """Update an existing workstream's properties.
+
+    Performs read-before-write to confirm the workstream exists. Requires
+    team manager or co-manager permissions. Pace must be "slow", "fast",
+    or "steady". Health must be "ok", "good", or "risk". Priority must
+    be "p1" through "p5".
+
+    Args:
+        ws_id: Workstream ID (positive integer)
+        ws_name: New name (optional)
+        ws_start_date: Start date in YYYY-MM-DD (optional)
+        ws_end_date: End date in YYYY-MM-DD (optional)
+        ws_pace: Pace: slow, fast, or steady (optional)
+        ws_health: Health: ok, good, or risk (optional)
+        ws_priority: Priority: p1 through p5 (optional)
+
+    Returns:
+        Updated workstream details
+    """
+    return await update_workstream(
+        ws_id=ws_id,
+        ws_name=ws_name,
+        ws_start_date=ws_start_date,
+        ws_end_date=ws_end_date,
+        ws_pace=ws_pace,
+        ws_health=ws_health,
+        ws_priority=ws_priority,
     )

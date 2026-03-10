@@ -49,6 +49,13 @@ The container image is built on the [Hummingbird Python base image](https://quay
 - `workboard_get_my_key_results` - List current user's key results with metric IDs and progress
 - `workboard_update_key_result` - Update key result progress for weekly OKR check-ins
 
+### Workstream Management (5 tools)
+- `workboard_get_workstreams` - Get team workstreams accessible to the authenticated user
+- `workboard_get_workstream_activities` - Get workstream details with all action items
+- `workboard_get_team_workstreams` - Get all workstreams belonging to a specific team
+- `workboard_create_workstream` - Create a new workstream for a team
+- `workboard_update_workstream` - Update workstream properties (name, dates, pace, health, priority)
+
 ## Installation
 
 ### With uvx (Recommended)
@@ -151,6 +158,20 @@ Assistant: [calls workboard_update_key_result with metric_id=12345, value="75"]
 ```
 User: Create an objective called "Increase retention" owned by user@example.com
 Assistant: [calls workboard_create_objective with name, owner, dates, and optional key_results]
+```
+
+### List Workstreams
+
+```
+User: Show me my workstreams
+Assistant: [calls workboard_get_workstreams]
+```
+
+### Get Workstream Action Items
+
+```
+User: Show me the agenda for workstream 4130463
+Assistant: [calls workboard_get_workstream_activities with ws_id=4130463]
 ```
 
 ## Security
