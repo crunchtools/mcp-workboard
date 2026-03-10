@@ -133,13 +133,13 @@ def _format_workstream(ws: dict[str, Any]) -> dict[str, Any]:
     return formatted
 
 
-def _extract_workstreams(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract workstream list from API response data.
+def _extract_workstreams(response_body: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract workstream list from API response body.
 
     The /workstream endpoint returns either a single object (when ws_id is
     passed) or an array. This helper normalizes both forms into a list.
     """
-    raw = data.get("workstream", [])
+    raw = response_body.get("workstream", [])
     if isinstance(raw, dict):
         return [raw]
     if isinstance(raw, list):
