@@ -162,23 +162,26 @@ def _format_goal(
 def _extract_goals_from_goal_response(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Extract goals list from a GET /goal response data object.
 
-    GET /goal returns goals directly under data.goal as either a dict with
-    numeric string keys or a list. This helper normalises both into a list.
+    GET /goal returns ``data.goal`` as a list of user objects, each containing
+    a ``people_goals`` array of the actual goal dicts. This helper flattens
+    all ``people_goals`` entries across all user objects into a single list.
 
     Args:
         data: The ``data`` object from a GET /goal API response.
 
     Returns:
-        List of raw goal dicts.
+        Flat list of raw goal dicts extracted from all user entries.
     """
-    goal_data = data.get("goal", {})
-    match goal_data:
-        case dict():
-            return [v for k, v in goal_data.items() if k.isdigit() and isinstance(v, dict)]
-        case list():
-            return goal_data
-        case _:
-            return []
+    goal_data = data.get("goal", [])
+    if not isinstance(goal_data, list):
+        return []
+    goals: list[dict[str, Any]] = []
+    for user_entry in goal_data:
+        if isinstance(user_entry, dict):
+            people_goals = user_entry.get("people_goals", [])
+            if isinstance(people_goals, list):
+                goals.extend(g for g in people_goals if isinstance(g, dict))
+    return goals
 
 
 def _current_year_start() -> int:
@@ -223,20 +226,30 @@ async def get_objectives(
     )
 
     first_data = first_response.get("data", {})
-    total_count = int(first_data.get("totalCount", 0))
-    all_goals: list[dict[str, Any]] = _extract_goals_from_goal_response(first_data)
+    # totalCount is the number of users (user entries), not goals
+    total_users = int(first_data.get("totalCount", 0))
+    first_user_entries = first_data.get("goal", []) if isinstance(first_data.get("goal"), list) else []
+    all_user_entries: list[dict[str, Any]] = [u for u in first_user_entries if isinstance(u, dict)]
 
     offset = _LIMIT
-    while len(all_goals) < total_count:
+    while len(all_user_entries) < total_users:
         response = await client.get(
             "/goal",
             params={"goal_status": 1, "limit": _LIMIT, "offset": offset},
         )
-        page_goals = _extract_goals_from_goal_response(response.get("data", {}))
-        if not page_goals:
+        page_data = response.get("data", {})
+        page_users = page_data.get("goal", []) if isinstance(page_data.get("goal"), list) else []
+        page_entries = [u for u in page_users if isinstance(u, dict)]
+        if not page_entries:
             break
-        all_goals.extend(page_goals)
+        all_user_entries.extend(page_entries)
         offset += _LIMIT
+
+    all_goals: list[dict[str, Any]] = []
+    for user_entry in all_user_entries:
+        people_goals = user_entry.get("people_goals", [])
+        if isinstance(people_goals, list):
+            all_goals.extend(g for g in people_goals if isinstance(g, dict))
 
     return {
         "objectives": [_format_goal(g, metric_target_dates) for g in all_goals],
