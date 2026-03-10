@@ -159,19 +159,11 @@ def _format_goal(
     return formatted_goal
 
 
-def _extract_goals_from_goal_response(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract goals list from a GET /goal response data object.
-
-    GET /goal returns goals directly under data.goal as either a dict with
-    numeric string keys or a list. This helper normalises both into a list.
-
-    Args:
-        data: The ``data`` object from a GET /goal API response.
-
-    Returns:
-        List of raw goal dicts.
-    """
-    goal_data = data.get("goal", {})
+def _extract_goals_from_goal_response(
+    response_body: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Normalise data.goal (dict with numeric keys or list) into a flat list."""
+    goal_data = response_body.get("goal", {})
     match goal_data:
         case dict():
             return [v for k, v in goal_data.items() if k.isdigit() and isinstance(v, dict)]
@@ -208,31 +200,41 @@ async def get_objectives(
     user_id = validate_user_id(user_id)
     client = get_client()
 
-    _LIMIT = 100
+    page_size = 100
 
     first_response, metric_target_dates = await asyncio.gather(
         client.get(
             "/goal",
-            params={"goal_owner_id": user_id, "goal_status": 1, "limit": _LIMIT, "offset": 0},
+            params={
+                "goal_owner_id": user_id,
+                "goal_status": 1,
+                "limit": page_size,
+                "offset": 0,
+            },
         ),
         _fetch_target_date_map(client),
     )
 
-    first_data = first_response.get("data", {})
-    total_count = int(first_data.get("totalCount", 0))
-    all_goals: list[dict[str, Any]] = _extract_goals_from_goal_response(first_data)
+    first_body = first_response.get("data", {})
+    total_count = int(first_body.get("totalCount", 0))
+    all_goals: list[dict[str, Any]] = _extract_goals_from_goal_response(first_body)
 
-    offset = _LIMIT
+    offset = page_size
     while len(all_goals) < total_count:
-        response = await client.get(
+        page_response = await client.get(
             "/goal",
-            params={"goal_owner_id": user_id, "goal_status": 1, "limit": _LIMIT, "offset": offset},
+            params={
+                "goal_owner_id": user_id,
+                "goal_status": 1,
+                "limit": page_size,
+                "offset": offset,
+            },
         )
-        page_goals = _extract_goals_from_goal_response(response.get("data", {}))
+        page_goals = _extract_goals_from_goal_response(page_response.get("data", {}))
         if not page_goals:
             break
         all_goals.extend(page_goals)
-        offset += _LIMIT
+        offset += page_size
 
     return {
         "objectives": [_format_goal(g, metric_target_dates) for g in all_goals],
@@ -284,8 +286,8 @@ async def _get_objective_ids_from_metrics(
     """
     response = await client.get("/metric")
 
-    data = response.get("data", {})
-    all_metrics = data.get("metric", []) if isinstance(data, dict) else []
+    metric_body = response.get("data", {})
+    all_metrics = metric_body.get("metric", []) if isinstance(metric_body, dict) else []
 
     target_date_map: dict[int, str] = {}
     for m in all_metrics:
@@ -323,8 +325,8 @@ async def _fetch_target_date_map(client: Any) -> dict[int, str]:
     """
     try:
         response = await client.get("/metric")
-        data = response.get("data", {})
-        metrics = data.get("metric", []) if isinstance(data, dict) else []
+        metric_body = response.get("data", {})
+        metrics = metric_body.get("metric", []) if isinstance(metric_body, dict) else []
         return {
             int(m["metric_id"]): _format_date(m.get("target_date"))
             for m in metrics
@@ -416,8 +418,8 @@ async def get_my_key_results(
 
     response = await client.get("/metric")
 
-    data = response.get("data", {})
-    metrics = data.get("metric", []) if isinstance(data, dict) else []
+    metric_body = response.get("data", {})
+    metrics = metric_body.get("metric", []) if isinstance(metric_body, dict) else []
 
     if not include_prior_years:
         year_start = _current_year_start()
@@ -458,12 +460,12 @@ async def get_user_key_results(
 
     response = await client.get(f"/user/{user_id}/metric")
 
-    data = response.get("data", {})
+    metric_body = response.get("data", {})
 
-    if isinstance(data, dict):
+    if isinstance(metric_body, dict):
         metrics = (
-            data.get("metric")
-            or data.get("user", {}).get("metric")
+            metric_body.get("metric")
+            or metric_body.get("user", {}).get("metric")
             or []
         )
     else:
