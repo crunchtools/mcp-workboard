@@ -191,16 +191,20 @@ def _current_year_start() -> int:
 async def get_objectives(
     user_id: int,
 ) -> dict[str, Any]:
-    """Get objectives owned by a WorkBoard user, with full pagination.
+    """Get all objectives visible to a WorkBoard user, with full pagination.
 
-    Uses ``GET /goal?goal_owner_id={user_id}`` which supports ``limit``/
-    ``offset`` pagination and returns only goals the user owns. Replaces
-    the previous ``GET /user/{user_id}/goal`` call which returned at most
-    15 results by default and mixed in goals the user was merely associated
-    with.
+    Uses ``GET /goal`` with ``limit``/``offset`` pagination, which returns
+    all goals the authenticated token can see (owned, associated, or visible
+    via team membership). Replaces the previous ``GET /user/{user_id}/goal``
+    call, which defaulted to 15 results and had no pagination support.
+
+    The ``user_id`` argument is accepted for API compatibility but is not
+    passed to the underlying endpoint — visibility is determined by the
+    token, not the user_id. To filter results by a specific owner, filter
+    the returned ``owner_id`` field in the calling code.
 
     Args:
-        user_id: User ID (positive integer)
+        user_id: User ID (positive integer, accepted for compatibility)
 
     Returns:
         Dictionary containing list of objectives
@@ -213,7 +217,7 @@ async def get_objectives(
     first_response, metric_target_dates = await asyncio.gather(
         client.get(
             "/goal",
-            params={"goal_owner_id": user_id, "goal_status": 1, "limit": _LIMIT, "offset": 0},
+            params={"goal_status": 1, "limit": _LIMIT, "offset": 0},
         ),
         _fetch_target_date_map(client),
     )
@@ -226,7 +230,7 @@ async def get_objectives(
     while len(all_goals) < total_count:
         response = await client.get(
             "/goal",
-            params={"goal_owner_id": user_id, "goal_status": 1, "limit": _LIMIT, "offset": offset},
+            params={"goal_status": 1, "limit": _LIMIT, "offset": offset},
         )
         page_goals = _extract_goals_from_goal_response(response.get("data", {}))
         if not page_goals:

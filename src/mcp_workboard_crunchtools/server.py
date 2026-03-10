@@ -163,10 +163,14 @@ async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
 async def workboard_get_objectives_tool(
     user_id: int,
 ) -> dict[str, Any]:
-    """Get objectives owned by a WorkBoard user by their user ID.
+    """Get all objectives visible to the authenticated WorkBoard user.
 
-    Returns all objectives the user owns, with full pagination. Also exposes
-    ``workstreams`` and ``status_color`` fields on each objective when present.
+    Uses GET /goal with full pagination (no 15-result default limit). Returns
+    all objectives the token can see — owned, associated, or visible via team
+    membership. Also exposes ``workstreams`` and ``status_color`` on each objective.
+
+    The user_id argument is accepted for API compatibility. To filter results
+    to a specific person's objectives, filter by ``owner_id`` in the response.
 
     Use workboard_get_user_tool (no arguments) to find the current user's ID.
     Use workboard_get_team_members_tool to resolve a name or email to a user ID.
@@ -175,7 +179,7 @@ async def workboard_get_objectives_tool(
         user_id: User ID (positive integer). Get this from workboard_get_user_tool.
 
     Returns:
-        List of objectives owned by the user, including all key results
+        List of all visible objectives including key results
     """
     return await get_objectives(user_id=user_id)
 
