@@ -171,8 +171,8 @@ async def get_workstreams(
         params["ws_id"] = ws_id
 
     response = await client.get("/workstream", params=params if params else None)
-    data = response.get("data", {})
-    workstreams = _extract_workstreams(data)
+    ws_body = response.get("data", {})
+    workstreams = _extract_workstreams(ws_body)
 
     return {"workstreams": [_format_workstream(ws) for ws in workstreams]}
 
@@ -192,13 +192,13 @@ async def get_workstream_activities(
     client = get_client()
 
     response = await client.get(f"/workstream/{ws_id}/activity")
-    data = response.get("data", {})
+    activity_body = response.get("data", {})
 
-    ws_data = data.get("workstream", {})
+    ws_data = activity_body.get("workstream", {})
     if isinstance(ws_data, dict) and ws_data:
         return {"workstream": _format_workstream(ws_data)}
 
-    return {"workstream": data}
+    return {"workstream": activity_body}
 
 
 async def get_team_workstreams(
@@ -218,9 +218,9 @@ async def get_team_workstreams(
     client = get_client()
 
     response = await client.get(f"/team/{team_id}/workstream")
-    data = response.get("data", {})
+    team_body = response.get("data", {})
 
-    team_data = data.get("team", {})
+    team_data = team_body.get("team", {})
     if not isinstance(team_data, dict):
         team_data = {}
 
