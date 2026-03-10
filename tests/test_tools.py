@@ -271,15 +271,13 @@ class TestObjectiveTools:
 
         resp = _mock_response(json_data={
             "data": {
-                "goal_count": 1,
-                "user": {
-                    "goal": {
-                        "0": {
-                            "goal_id": 100,
-                            "goal_name": "Ship v1",
-                            "goal_progress": "75",
-                            "goal_metrics": [],
-                        },
+                "totalCount": 1,
+                "goal": {
+                    "0": {
+                        "goal_id": 100,
+                        "goal_name": "Ship v1",
+                        "goal_progress": "75",
+                        "goal_metrics": [],
                     },
                 },
                 "metric": [],
