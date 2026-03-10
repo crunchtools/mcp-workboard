@@ -1,6 +1,6 @@
 # mcp-workboard-crunchtools Constitution
 
-> **Version:** 1.1.0
+> **Version:** 1.2.0
 > **Ratified:** 2026-03-10
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.2.0
@@ -106,6 +106,17 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/) strictly.
 
 All code MUST pass Gourmand checks before merge. Zero violations required.
 
+### 8. Commit Standards
+
+AI-assisted commits MUST include the `Co-Authored-By` trailer:
+```
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+### 9. License
+
+This repository is licensed under **AGPL-3.0-or-later**. A `LICENSE` file containing the full license text MUST be present in the repository root.
+
 ---
 
 ## II. Technology Stack
@@ -138,6 +149,15 @@ Every tool MUST have a corresponding mocked test. Tests use `httpx.AsyncClient` 
 3. Call the tool function directly (not the `_tool` wrapper)
 4. Assert response structure and values
 
+**Required test coverage per tool group:**
+
+| Tool Group | Test Pattern | Minimum Assertions |
+|------------|-------------|-------------------|
+| Each read tool | `test_list_*`, `test_get_*` | Pagination headers, response shape |
+| Each write tool | `test_create_*`, `test_update_*` | POST/PUT with correct status codes |
+| Each delete tool | `test_delete_*` | 204 No Content handling |
+| Error cases | `TestClientErrorHandling` | 401, 404, 429, 204 responses |
+
 **Singleton reset:** The `_reset_client_singleton` autouse fixture resets `client._client` and `config._config` between every test to prevent state leakage.
 
 **Tool count assertion:** `test_tool_count` MUST be updated whenever tools are added or removed. This catches accidental regressions.
@@ -148,6 +168,7 @@ Every Pydantic model in `models.py` MUST have tests in `test_validation.py`:
 - Valid minimal input
 - Valid full input
 - Invalid/rejected inputs (empty strings, too-long values, extra fields)
+- Injection prevention (special characters in identifiers)
 
 ### Security Tests
 
@@ -170,7 +191,7 @@ All code MUST pass `gourmand --full .` with **zero violations** before merge. Go
 ### Exception Policy
 
 Exceptions MUST have documented justifications in `gourmand-exceptions.toml`. Acceptable reasons:
-- Standard API patterns (HTTP status codes)
+- Standard API patterns (HTTP status codes, pagination params)
 - Test-specific patterns (intentional invalid input)
 - Framework requirements (CLAUDE.md for Claude Code)
 
@@ -193,13 +214,35 @@ Every code change must pass through these gates in order:
 | test | Lint + mypy + pytest (Python 3.10-3.12) | Yes |
 | gourmand | AI slop detection | Yes |
 | build-container | Containerfile builds | Yes |
-| security | Weekly CVE scan | Scheduled |
+| security | Weekly CVE scan + CodeQL | Scheduled |
 | publish | PyPI trusted publishing | On release tag |
-| container | Quay.io push + Trivy | On release tag |
+| container | Dual push: Quay.io job + GHCR job (dependency chain) | On release tag |
 
 ---
 
-## VI. Naming Conventions
+## VI. Container Conventions
+
+- Use **Containerfile** (not Dockerfile) as the build file name.
+- Base image: **Hummingbird** (`quay.io/hummingbird/*`) for minimal CVE surface.
+- Always `dnf clean all` after package installs.
+- Required LABELs: `maintainer`, `description`.
+- Required OCI labels:
+  ```
+  org.opencontainers.image.source=https://github.com/crunchtools/mcp-workboard
+  org.opencontainers.image.description=MCP server for WorkBoard OKR platform
+  org.opencontainers.image.licenses=AGPL-3.0-or-later
+  ```
+
+### Dual-Push CI Architecture
+
+Container CI workflows MUST use two separate jobs:
+
+1. **`build-and-push-quay`** — Builds and pushes to Quay.io. Includes Trivy security scan.
+2. **`build-and-push-ghcr`** — Builds and pushes to GHCR. Uses `needs: build-and-push-quay` dependency. Gated with `if: github.event_name != 'pull_request'`.
+
+---
+
+## VII. Naming Conventions
 
 | Context | Name |
 |---------|------|
@@ -207,14 +250,15 @@ Every code change must pass through these gates in order:
 | PyPI package | `mcp-workboard-crunchtools` |
 | CLI command | `mcp-workboard-crunchtools` |
 | Python module | `mcp_workboard_crunchtools` |
-| Container image | `quay.io/crunchtools/mcp-workboard` |
+| Container (Quay) | `quay.io/crunchtools/mcp-workboard` |
+| Container (GHCR) | `ghcr.io/crunchtools/mcp-workboard` |
 | systemd service | `mcp-workboard.service` |
 | HTTP port | 8007 |
 | License | AGPL-3.0-or-later |
 
 ---
 
-## VII. Development Workflow
+## VIII. Development Workflow
 
 ### Adding a New Tool
 
@@ -242,9 +286,35 @@ Every code change must pass through these gates in order:
 4. The release tag automatically triggers PyPI publishing and container image pushes
 5. Verify all three distribution channels are live (uvx, pip, container)
 
+### Specification-Driven Development
+
+Every new feature MUST have a spec file (`.specify/specs/NNN-slug/spec.md`) before implementation begins. Specs are numbered sequentially (001, 002, ...).
+
+**Requires a spec:**
+- New tools or tool groups
+- New architectural layers or subsystems
+- Changes to the defense/security model
+- New external service integrations
+- Changes that affect multiple modules
+
+**Exempt from spec requirement:**
+- Bug fixes
+- Dependency updates
+- CI/CD and infrastructure changes
+- Documentation-only changes
+- Constitution amendments (governed by ratification process)
+- Single-tool additions that follow an existing, documented pattern
+
 ---
 
-## VIII. Governance
+## IX. Governance
+
+### spec-kit Framework
+
+This repo includes:
+- `.specify/memory/constitution.md` — This document
+- `.specify/specs/000-baseline/spec.md` — Tool inventory and architecture spec
+- `.specify/templates/` — `plan-template.md` and `spec-template.md`
 
 ### Amendment Process
 
@@ -259,3 +329,4 @@ Every code change must pass through these gates in order:
 |---------|------|---------|
 | 1.0.0 | 2026-02-27 | Initial constitution |
 | 1.1.0 | 2026-03-10 | Adopt org constitution v1.2.0: mandatory GitHub Release, release workflow |
+| 1.2.0 | 2026-03-10 | Full compliance with org v1.2.0 and MCP Server profile v1.0.0 |
