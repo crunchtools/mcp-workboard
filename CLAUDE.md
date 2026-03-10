@@ -6,18 +6,18 @@ Secure MCP server for WorkBoard OKR and strategy execution platform. 13 tools ac
 
 ```bash
 # uvx (recommended)
-claude mcp add mcp-workboard-crunchtools \
+claude mcp add mcp-workboard \
     --env WORKBOARD_API_TOKEN=your_token_here \
     -- uvx mcp-workboard-crunchtools
 
 # Container
-claude mcp add mcp-workboard-crunchtools \
+claude mcp add mcp-workboard \
     --env WORKBOARD_API_TOKEN=your_token_here \
     -- podman run -i --rm -e WORKBOARD_API_TOKEN quay.io/crunchtools/mcp-workboard
 
 # Local development
 cd ~/Projects/crunchtools/mcp-workboard
-claude mcp add mcp-workboard-crunchtools \
+claude mcp add mcp-workboard \
     --env WORKBOARD_API_TOKEN=your_token_here \
     -- uv run mcp-workboard-crunchtools
 ```
