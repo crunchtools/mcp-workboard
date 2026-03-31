@@ -282,6 +282,9 @@ class CreateActivityInput(BaseModel):
         ..., min_length=1, max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
         description="Description of the action item",
     )
+    ai_note: str | None = Field(
+        default=None, description="Notes or body text for the action item",
+    )
     ai_workstream: str | None = Field(
         default=None, min_length=1, description="Workstream ID",
     )
@@ -340,6 +343,9 @@ class UpdateActivityInput(BaseModel):
     ai_description: str | None = Field(
         default=None, min_length=1, max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
         description="Description of the action item",
+    )
+    ai_note: str | None = Field(
+        default=None, description="Notes or body text for the action item",
     )
     ai_owner: str | None = Field(
         default=None, min_length=1, description="Owner user ID or email",

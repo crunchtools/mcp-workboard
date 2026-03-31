@@ -539,6 +539,7 @@ async def workboard_get_activity_tool(
 @mcp.tool()
 async def workboard_create_activity_tool(
     ai_description: str,
+    ai_note: str | None = None,
     ai_workstream: str | None = None,
     ai_team: str | None = None,
     ai_owner: str | None = None,
@@ -554,7 +555,8 @@ async def workboard_create_activity_tool(
     Effort must be "easy", "medium", or "huge".
 
     Args:
-        ai_description: Description of the action item (required)
+        ai_description: Description of the action item — shown as the card title (required)
+        ai_note: Notes or body text for the action item (optional)
         ai_workstream: Workstream ID to place the action item in (optional)
         ai_team: Team ID to associate with (optional)
         ai_owner: Owner user ID or email (optional)
@@ -568,6 +570,7 @@ async def workboard_create_activity_tool(
     """
     return await create_activity(
         ai_description=ai_description,
+        ai_note=ai_note,
         ai_workstream=ai_workstream,
         ai_team=ai_team,
         ai_owner=ai_owner,
@@ -582,6 +585,7 @@ async def workboard_create_activity_tool(
 async def workboard_update_activity_tool(
     activity_id: int,
     ai_description: str | None = None,
+    ai_note: str | None = None,
     ai_owner: str | None = None,
     ai_state: str | None = None,
     ai_priority: str | None = None,
@@ -597,7 +601,8 @@ async def workboard_update_activity_tool(
 
     Args:
         activity_id: Action item ID (positive integer)
-        ai_description: New description (optional)
+        ai_description: New description — shown as the card title (optional)
+        ai_note: New notes or body text (optional)
         ai_owner: New owner user ID or email (optional)
         ai_state: New state: next, doing, done, or pause (optional)
         ai_priority: New priority: low, med, or high (optional)
@@ -610,6 +615,7 @@ async def workboard_update_activity_tool(
     return await update_activity(
         activity_id=activity_id,
         ai_description=ai_description,
+        ai_note=ai_note,
         ai_owner=ai_owner,
         ai_state=ai_state,
         ai_priority=ai_priority,

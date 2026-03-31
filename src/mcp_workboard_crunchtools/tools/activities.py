@@ -22,6 +22,7 @@ def _format_activity(ai: dict[str, Any]) -> dict[str, Any]:
     formatted: dict[str, Any] = {
         "ai_id": ai.get("ai_id", ""),
         "description": ai.get("ai_description", ""),
+        "note": ai.get("ai_note"),
         "state": ai.get("ai_state", ""),
         "priority": ai.get("ai_priority", ""),
         "effort": ai.get("ai_effort", ""),
@@ -174,6 +175,7 @@ async def get_activity(
 
 async def create_activity(
     ai_description: str,
+    ai_note: str | None = None,
     ai_workstream: str | None = None,
     ai_team: str | None = None,
     ai_owner: str | None = None,
@@ -186,6 +188,7 @@ async def create_activity(
 
     Args:
         ai_description: Description of the action item (required).
+        ai_note: Notes or body text for the action item.
         ai_workstream: Workstream ID to associate the action item with.
         ai_team: Team ID to associate the action item with.
         ai_owner: Owner user ID or email.
@@ -199,6 +202,7 @@ async def create_activity(
     """
     validated = CreateActivityInput(
         ai_description=ai_description,
+        ai_note=ai_note,
         ai_workstream=ai_workstream,
         ai_team=ai_team,
         ai_owner=ai_owner,
@@ -209,6 +213,8 @@ async def create_activity(
     )
 
     payload: dict[str, Any] = {"ai_description": validated.ai_description}
+    if validated.ai_note is not None:
+        payload["ai_note"] = validated.ai_note
     if validated.ai_workstream is not None:
         payload["ai_workstream"] = validated.ai_workstream
     if validated.ai_team is not None:
@@ -240,6 +246,7 @@ async def create_activity(
 async def update_activity(
     activity_id: int,
     ai_description: str | None = None,
+    ai_note: str | None = None,
     ai_owner: str | None = None,
     ai_state: str | None = None,
     ai_priority: str | None = None,
@@ -254,6 +261,7 @@ async def update_activity(
     Args:
         activity_id: Action item ID (positive integer).
         ai_description: New description (optional).
+        ai_note: New notes or body text (optional).
         ai_owner: New owner user ID or email (optional).
         ai_state: New state: next, doing, done, or pause (optional).
         ai_priority: New priority: low, med, or high (optional).
@@ -267,6 +275,7 @@ async def update_activity(
 
     validated = UpdateActivityInput(
         ai_description=ai_description,
+        ai_note=ai_note,
         ai_owner=ai_owner,
         ai_state=ai_state,
         ai_priority=ai_priority,
@@ -281,6 +290,8 @@ async def update_activity(
     payload: dict[str, Any] = {}
     if validated.ai_description is not None:
         payload["ai_description"] = validated.ai_description
+    if validated.ai_note is not None:
+        payload["ai_note"] = validated.ai_note
     if validated.ai_owner is not None:
         payload["ai_owner"] = validated.ai_owner
     if validated.ai_state is not None:
