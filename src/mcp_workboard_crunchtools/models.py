@@ -5,6 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from .errors import (
+    InvalidActivityIdError,
     InvalidMetricIdError,
     InvalidObjectiveIdError,
     InvalidUserIdError,
@@ -45,6 +46,13 @@ def validate_workstream_id(workstream_id: int) -> int:
     if not isinstance(workstream_id, int) or workstream_id <= 0:
         raise InvalidWorkstreamIdError
     return workstream_id
+
+
+def validate_activity_id(activity_id: int) -> int:
+    """Validate an activity ID is a positive integer."""
+    if not isinstance(activity_id, int) or activity_id <= 0:
+        raise InvalidActivityIdError
+    return activity_id
 
 
 class CreateUserInput(BaseModel):
@@ -168,6 +176,8 @@ class CreateObjectiveInput(BaseModel):
         return v
 
 
+MAX_ACTIVITY_DESCRIPTION_LENGTH = 500
+
 MAX_WORKSTREAM_NAME_LENGTH = 500
 MAX_WORKSTREAM_OBJECTIVE_LENGTH = 2000
 
@@ -255,4 +265,118 @@ class UpdateWorkstreamInput(BaseModel):
         """Validate priority is one of the allowed values."""
         if v is not None and v not in _VALID_PRIORITY:
             raise ValueError(f"ws_priority must be one of {sorted(_VALID_PRIORITY)}, got: {v!r}")
+        return v
+
+
+_VALID_AI_STATE = {"next", "doing", "done", "pause"}
+_VALID_AI_PRIORITY = {"low", "med", "high"}
+_VALID_AI_EFFORT = {"easy", "medium", "huge"}
+
+
+class CreateActivityInput(BaseModel):
+    """Validated input for creating a new action item (activity)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ai_description: str = Field(
+        ..., min_length=1, max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
+        description="Description of the action item",
+    )
+    ai_workstream: str | None = Field(
+        default=None, min_length=1, description="Workstream ID",
+    )
+    ai_team: str | None = Field(
+        default=None, min_length=1, description="Team ID",
+    )
+    ai_owner: str | None = Field(
+        default=None, min_length=1, description="Owner user ID or email",
+    )
+    ai_state: str | None = Field(
+        default=None, description="State: next, doing, done, or pause",
+    )
+    ai_priority: str | None = Field(
+        default=None, description="Priority: low, med, or high",
+    )
+    ai_effort: str | None = Field(
+        default=None, description="Effort: easy, medium, or huge",
+    )
+    ai_due_date: str | None = Field(
+        default=None, min_length=1, description="Due date as UNIX timestamp string",
+    )
+
+    @field_validator("ai_state")
+    @classmethod
+    def state_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate state is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_STATE:
+            raise ValueError(f"ai_state must be one of {sorted(_VALID_AI_STATE)}, got: {v!r}")
+        return v
+
+    @field_validator("ai_priority")
+    @classmethod
+    def priority_must_be_valid_ai(cls, v: str | None) -> str | None:
+        """Validate priority is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_PRIORITY:
+            raise ValueError(f"ai_priority must be one of {sorted(_VALID_AI_PRIORITY)}, got: {v!r}")
+        return v
+
+    @field_validator("ai_effort")
+    @classmethod
+    def effort_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate effort is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_EFFORT:
+            raise ValueError(f"ai_effort must be one of {sorted(_VALID_AI_EFFORT)}, got: {v!r}")
+        return v
+
+
+class UpdateActivityInput(BaseModel):
+    """Validated input for updating an existing action item.
+
+    All fields are optional — only provided fields will be sent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ai_description: str | None = Field(
+        default=None, min_length=1, max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
+        description="Description of the action item",
+    )
+    ai_owner: str | None = Field(
+        default=None, min_length=1, description="Owner user ID or email",
+    )
+    ai_state: str | None = Field(
+        default=None, description="State: next, doing, done, or pause",
+    )
+    ai_priority: str | None = Field(
+        default=None, description="Priority: low, med, or high",
+    )
+    ai_effort: str | None = Field(
+        default=None, description="Effort: easy, medium, or huge",
+    )
+    ai_due_date: str | None = Field(
+        default=None, min_length=1, description="Due date as UNIX timestamp string",
+    )
+
+    @field_validator("ai_state")
+    @classmethod
+    def state_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate state is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_STATE:
+            raise ValueError(f"ai_state must be one of {sorted(_VALID_AI_STATE)}, got: {v!r}")
+        return v
+
+    @field_validator("ai_priority")
+    @classmethod
+    def priority_must_be_valid_ai(cls, v: str | None) -> str | None:
+        """Validate priority is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_PRIORITY:
+            raise ValueError(f"ai_priority must be one of {sorted(_VALID_AI_PRIORITY)}, got: {v!r}")
+        return v
+
+    @field_validator("ai_effort")
+    @classmethod
+    def effort_must_be_valid(cls, v: str | None) -> str | None:
+        """Validate effort is one of the allowed values."""
+        if v is not None and v not in _VALID_AI_EFFORT:
+            raise ValueError(f"ai_effort must be one of {sorted(_VALID_AI_EFFORT)}, got: {v!r}")
         return v

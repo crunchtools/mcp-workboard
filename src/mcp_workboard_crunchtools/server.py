@@ -6,9 +6,11 @@ from typing import Any
 from fastmcp import FastMCP
 
 from .tools import (
+    create_activity,
     create_objective,
     create_user,
     create_workstream,
+    get_activity,
     get_my_key_results,
     get_my_objectives,
     get_objective_details,
@@ -20,7 +22,9 @@ from .tools import (
     get_user_key_results,
     get_workstream_activities,
     get_workstreams,
+    list_activities,
     list_users,
+    update_activity,
     update_key_result,
     update_user,
     update_workstream,
@@ -50,7 +54,12 @@ mcp = FastMCP(
         "and target date.\n\n"
         "WORKSTREAMS: Use workboard_get_workstreams_tool to list accessible workstreams, "
         "workboard_get_workstream_activities_tool to see action items for a workstream, "
-        "and workboard_get_team_workstreams_tool to see workstreams for a specific team."
+        "and workboard_get_team_workstreams_tool to see workstreams for a specific team.\n\n"
+        "ACTION ITEMS: Use workboard_list_activities_tool to list action items with optional "
+        "filters, workboard_get_activity_tool to get a single action item by ID, "
+        "workboard_create_activity_tool to create a new action item, and "
+        "workboard_update_activity_tool to update an existing action item's state, priority, "
+        "effort, due date, or owner."
     ),
 )
 
@@ -473,4 +482,137 @@ async def workboard_update_workstream_tool(
         ws_pace=ws_pace,
         ws_health=ws_health,
         ws_priority=ws_priority,
+    )
+
+
+@mcp.tool()
+async def workboard_list_activities_tool(
+    ai_owner: str | None = None,
+    ai_state: str | None = None,
+    ai_priority: str | None = None,
+    ai_effort: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict[str, Any]:
+    """List action items accessible to the authenticated user.
+
+    Returns up to 15 action items by default. Use limit and offset for
+    pagination. Filter by owner, state, priority, or effort to narrow results.
+
+    Args:
+        ai_owner: Filter by owner user ID or email (optional)
+        ai_state: Filter by state: next, doing, done, or pause (optional)
+        ai_priority: Filter by priority: low, med, or high (optional)
+        ai_effort: Filter by effort: easy, medium, or huge (optional)
+        limit: Maximum number of results (optional)
+        offset: Pagination offset (optional)
+
+    Returns:
+        List of action items with descriptions, states, owners, and due dates
+    """
+    return await list_activities(
+        ai_owner=ai_owner,
+        ai_state=ai_state,
+        ai_priority=ai_priority,
+        ai_effort=ai_effort,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@mcp.tool()
+async def workboard_get_activity_tool(
+    activity_id: int,
+) -> dict[str, Any]:
+    """Get a single WorkBoard action item by its ID.
+
+    Args:
+        activity_id: Action item ID (positive integer)
+
+    Returns:
+        Action item details including description, state, owner, due date,
+        comments, sub-actions, and attached files
+    """
+    return await get_activity(activity_id=activity_id)
+
+
+@mcp.tool()
+async def workboard_create_activity_tool(
+    ai_description: str,
+    ai_workstream: str | None = None,
+    ai_team: str | None = None,
+    ai_owner: str | None = None,
+    ai_state: str | None = None,
+    ai_priority: str | None = None,
+    ai_effort: str | None = None,
+    ai_due_date: str | None = None,
+) -> dict[str, Any]:
+    """Create a new action item (card) on a WorkBoard workstream.
+
+    State must be "next", "doing", "done", or "pause".
+    Priority must be "low", "med", or "high".
+    Effort must be "easy", "medium", or "huge".
+
+    Args:
+        ai_description: Description of the action item (required)
+        ai_workstream: Workstream ID to place the action item in (optional)
+        ai_team: Team ID to associate with (optional)
+        ai_owner: Owner user ID or email (optional)
+        ai_state: Initial state: next, doing, done, or pause (optional)
+        ai_priority: Priority: low, med, or high (optional)
+        ai_effort: Effort estimate: easy, medium, or huge (optional)
+        ai_due_date: Due date as UNIX timestamp string (optional)
+
+    Returns:
+        Created action item details
+    """
+    return await create_activity(
+        ai_description=ai_description,
+        ai_workstream=ai_workstream,
+        ai_team=ai_team,
+        ai_owner=ai_owner,
+        ai_state=ai_state,
+        ai_priority=ai_priority,
+        ai_effort=ai_effort,
+        ai_due_date=ai_due_date,
+    )
+
+
+@mcp.tool()
+async def workboard_update_activity_tool(
+    activity_id: int,
+    ai_description: str | None = None,
+    ai_owner: str | None = None,
+    ai_state: str | None = None,
+    ai_priority: str | None = None,
+    ai_effort: str | None = None,
+    ai_due_date: str | None = None,
+) -> dict[str, Any]:
+    """Update an existing WorkBoard action item.
+
+    Performs read-before-write to confirm the action item exists. Only
+    provided fields are updated. State must be "next", "doing", "done",
+    or "pause". Priority must be "low", "med", or "high". Effort must
+    be "easy", "medium", or "huge".
+
+    Args:
+        activity_id: Action item ID (positive integer)
+        ai_description: New description (optional)
+        ai_owner: New owner user ID or email (optional)
+        ai_state: New state: next, doing, done, or pause (optional)
+        ai_priority: New priority: low, med, or high (optional)
+        ai_effort: New effort: easy, medium, or huge (optional)
+        ai_due_date: New due date as UNIX timestamp string (optional)
+
+    Returns:
+        Updated action item details
+    """
+    return await update_activity(
+        activity_id=activity_id,
+        ai_description=ai_description,
+        ai_owner=ai_owner,
+        ai_state=ai_state,
+        ai_priority=ai_priority,
+        ai_effort=ai_effort,
+        ai_due_date=ai_due_date,
     )

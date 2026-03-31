@@ -3,6 +3,12 @@
 This package contains all the MCP tool implementations for WorkBoard operations.
 """
 
+from .activities import (
+    create_activity,
+    get_activity,
+    list_activities,
+    update_activity,
+)
 from .objectives import (
     create_objective,
     get_my_key_results,
@@ -23,6 +29,10 @@ from .workstreams import (
 )
 
 __all__ = [
+    "list_activities",
+    "get_activity",
+    "create_activity",
+    "update_activity",
     "get_user",
     "list_users",
     "create_user",

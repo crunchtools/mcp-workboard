@@ -21,10 +21,10 @@ class TestToolRegistration:
         assert mcp is not None
 
     def test_tool_count(self) -> None:
-        """Server should have exactly 18 tools registered."""
+        """Server should have exactly 22 tools registered."""
         from mcp_workboard_crunchtools.tools import __all__
 
-        assert len(__all__) == 18
+        assert len(__all__) == 22
 
     def test_imports(self) -> None:
         """All tool functions should be importable."""
@@ -69,6 +69,7 @@ class TestErrorSafety:
         """All errors should inherit from UserError."""
         from mcp_workboard_crunchtools.errors import (
             ConfigurationError,
+            InvalidActivityIdError,
             InvalidMetricIdError,
             InvalidObjectiveIdError,
             InvalidUserIdError,
@@ -86,6 +87,7 @@ class TestErrorSafety:
         assert issubclass(InvalidObjectiveIdError, UserError)
         assert issubclass(InvalidMetricIdError, UserError)
         assert issubclass(InvalidWorkstreamIdError, UserError)
+        assert issubclass(InvalidActivityIdError, UserError)
         assert issubclass(NotFoundError, UserError)
         assert issubclass(PermissionDeniedError, UserError)
         assert issubclass(RateLimitError, UserError)
@@ -768,6 +770,139 @@ class TestWorkstreamTools:
             result = await update_workstream(ws_id=100, ws_health="risk")
 
         assert "workstream" in result
+
+
+class TestActivityTools:
+    """Tests for activity tools with mocked API responses."""
+
+    @pytest.mark.asyncio
+    async def test_list_activities(self) -> None:
+        """list_activities should return formatted activity list."""
+        from mcp_workboard_crunchtools.tools import list_activities
+
+        resp = _mock_response(json_data={
+            "data": {
+                "activity": [
+                    {
+                        "ai_id": "500",
+                        "ai_description": "Write design doc",
+                        "ai_state": "doing",
+                        "ai_priority": "high",
+                        "ai_effort": "medium",
+                        "ai_due_date": "1800000000",
+                        "ai_owner": "alice@example.com",
+                        "ai_created_by": "bob@example.com",
+                        "ai_created_at": "2026-01-10",
+                        "ai_completed_at": None,
+                        "ai_url": "https://workboard.com/ai/500",
+                        "ai_workstream": "100",
+                        "ai_workstream_name": "Q1 Sprint",
+                        "ai_team": "10",
+                    },
+                ],
+                "activity_count": 1,
+            },
+        })
+
+        with _patch_client(resp):
+            result = await list_activities()
+
+        assert "activities" in result
+        assert len(result["activities"]) == 1
+        assert result["activities"][0]["description"] == "Write design doc"
+        assert result["activities"][0]["state"] == "doing"
+
+    @pytest.mark.asyncio
+    async def test_get_activity(self) -> None:
+        """get_activity should return a single action item."""
+        from mcp_workboard_crunchtools.tools import get_activity
+
+        resp = _mock_response(json_data={
+            "data": {
+                "activity": {
+                    "ai_id": "500",
+                    "ai_description": "Write design doc",
+                    "ai_state": "doing",
+                    "ai_priority": "high",
+                    "ai_effort": "medium",
+                    "ai_due_date": "1800000000",
+                    "ai_owner": "alice@example.com",
+                    "ai_created_by": "bob@example.com",
+                    "ai_created_at": "2026-01-10",
+                    "ai_completed_at": None,
+                    "ai_url": "https://workboard.com/ai/500",
+                    "ai_workstream": "100",
+                    "ai_workstream_name": "Q1 Sprint",
+                    "ai_team": "10",
+                },
+            },
+        })
+
+        with _patch_client(resp):
+            result = await get_activity(activity_id=500)
+
+        assert "activity" in result
+        assert result["activity"]["description"] == "Write design doc"
+
+    @pytest.mark.asyncio
+    async def test_create_activity(self) -> None:
+        """create_activity should post and return created action item."""
+        from mcp_workboard_crunchtools.tools import create_activity
+
+        resp = _mock_response(json_data={
+            "data": {"ai_id": "501", "ai_description": "Review PR"},
+        })
+
+        with _patch_client(resp):
+            result = await create_activity(
+                ai_description="Review PR",
+                ai_workstream="100",
+                ai_state="next",
+            )
+
+        assert "activity" in result
+
+    @pytest.mark.asyncio
+    async def test_update_activity(self) -> None:
+        """update_activity should read then put and return updated action item."""
+        from mcp_workboard_crunchtools.tools import update_activity
+
+        read_resp = _mock_response(json_data={
+            "data": {
+                "activity": {
+                    "ai_id": "500",
+                    "ai_description": "Write design doc",
+                    "ai_state": "doing",
+                },
+            },
+        })
+        update_resp = _mock_response(json_data={
+            "data": {"ai_id": "500", "ai_state": "done"},
+        })
+
+        import os
+
+        import mcp_workboard_crunchtools.client as client_mod
+        import mcp_workboard_crunchtools.config as config_mod
+
+        client_mod._client = None
+        config_mod._config = None
+        os.environ.setdefault("WORKBOARD_API_TOKEN", "test-mock-token")
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+
+        async def side_effect(**kwargs):  # type: ignore[no-untyped-def]
+            method = kwargs.get("method", "GET")
+            if method == "PUT":
+                return update_resp
+            return read_resp
+
+        mock_http.request = AsyncMock(side_effect=side_effect)
+
+        with patch.object(httpx, "AsyncClient", return_value=mock_http):
+            result = await update_activity(activity_id=500, ai_state="done")
+
+        assert "activity" in result
 
 
 class TestClientErrorHandling:
