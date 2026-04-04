@@ -162,13 +162,23 @@ def _format_goal(
 def _extract_goals_from_goal_response(
     response_body: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Normalise data.goal (dict with numeric keys or list) into a flat list."""
+    """Normalise data.goal (dict with numeric keys, list of goals, or list of
+    user-wrappers with ``people_goals``) into a flat list of goal dicts."""
     goal_data = response_body.get("goal", {})
     match goal_data:
         case dict():
             return [v for k, v in goal_data.items() if k.isdigit() and isinstance(v, dict)]
         case list():
-            return goal_data
+            goals: list[dict[str, Any]] = []
+            for item in goal_data:
+                if not isinstance(item, dict):
+                    continue
+                people_goals = item.get("people_goals")
+                if isinstance(people_goals, list):
+                    goals.extend(g for g in people_goals if isinstance(g, dict))
+                elif "goal_id" in item:
+                    goals.append(item)
+            return goals
         case _:
             return []
 
