@@ -23,10 +23,18 @@ class Config:
         Raises:
             ConfigurationError: If required environment variables are missing.
         """
-        token = os.environ.get("WORKBOARD_API_TOKEN")
+        token_file = os.environ.get("WORKBOARD_API_TOKEN_FILE")
+        if token_file:
+            try:
+                with open(token_file) as f:
+                    token = f.read().strip()
+            except (OSError, IOError) as e:
+                raise ConfigurationError(f"Failed to read token from {token_file}: {e}")
+        else:
+            token = os.environ.get("WORKBOARD_API_TOKEN")
         if not token:
             raise ConfigurationError(
-                "WORKBOARD_API_TOKEN environment variable required. "
+                "WORKBOARD_API_TOKEN or WORKBOARD_API_TOKEN_FILE environment variable required. "
                 "Generate a JWT token from your WorkBoard admin settings."
             )
 

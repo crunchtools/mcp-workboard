@@ -120,6 +120,7 @@ class TestConfigSafety:
         from mcp_workboard_crunchtools.errors import ConfigurationError
 
         token = os.environ.pop("WORKBOARD_API_TOKEN", None)
+        token_file = os.environ.pop("WORKBOARD_API_TOKEN_FILE", None)
 
         try:
             import mcp_workboard_crunchtools.config as config_module
@@ -129,6 +130,54 @@ class TestConfigSafety:
             with pytest.raises(ConfigurationError):
                 Config()
         finally:
+            if token:
+                os.environ["WORKBOARD_API_TOKEN"] = token
+            if token_file:
+                os.environ["WORKBOARD_API_TOKEN_FILE"] = token_file
+
+    def test_config_loads_token_from_file(self, tmp_path) -> None:
+        """Config should load token from WORKBOARD_API_TOKEN_FILE."""
+        import os
+
+        from mcp_workboard_crunchtools.config import Config
+
+        token_file = tmp_path / "token"
+        token_file.write_text("file_based_secret_token\n")
+
+        token = os.environ.pop("WORKBOARD_API_TOKEN", None)
+        os.environ["WORKBOARD_API_TOKEN_FILE"] = str(token_file)
+
+        try:
+            import mcp_workboard_crunchtools.config as config_module
+
+            config_module._config = None
+
+            config = Config()
+            assert config.token == "file_based_secret_token"
+        finally:
+            del os.environ["WORKBOARD_API_TOKEN_FILE"]
+            if token:
+                os.environ["WORKBOARD_API_TOKEN"] = token
+
+    def test_config_file_not_found(self) -> None:
+        """Config should raise ConfigurationError for missing token file."""
+        import os
+
+        from mcp_workboard_crunchtools.config import Config
+        from mcp_workboard_crunchtools.errors import ConfigurationError
+
+        token = os.environ.pop("WORKBOARD_API_TOKEN", None)
+        os.environ["WORKBOARD_API_TOKEN_FILE"] = "/nonexistent/path/token"
+
+        try:
+            import mcp_workboard_crunchtools.config as config_module
+
+            config_module._config = None
+
+            with pytest.raises(ConfigurationError):
+                Config()
+        finally:
+            del os.environ["WORKBOARD_API_TOKEN_FILE"]
             if token:
                 os.environ["WORKBOARD_API_TOKEN"] = token
 

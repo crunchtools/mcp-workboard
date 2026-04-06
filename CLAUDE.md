@@ -26,7 +26,10 @@ claude mcp add mcp-workboard \
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `WORKBOARD_API_TOKEN` | Yes | — | WorkBoard JWT API token |
+| `WORKBOARD_API_TOKEN` | Yes* | — | WorkBoard JWT API token |
+| `WORKBOARD_API_TOKEN_FILE` | Yes* | — | Path to file containing WorkBoard JWT API token |
+
+\* One of `WORKBOARD_API_TOKEN` or `WORKBOARD_API_TOKEN_FILE` is required. File-based loading is preferred for security.
 
 ## Available Tools (18)
 
