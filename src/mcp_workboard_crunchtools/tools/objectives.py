@@ -23,7 +23,6 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 
-
 def _format_date(timestamp: str | int | None) -> str:
     """Convert Unix timestamp to YYYY-MM-DD."""
     if timestamp is None:
@@ -82,9 +81,7 @@ def _format_metric(
     except (ValueError, TypeError):
         last_update_ts = 0
 
-    formatted_metric["last_updated"] = (
-        _format_date(last_update_ts) if last_update_ts > 0 else None
-    )
+    formatted_metric["last_updated"] = _format_date(last_update_ts) if last_update_ts > 0 else None
 
     return formatted_metric
 
@@ -162,13 +159,22 @@ def _format_goal(
 def _extract_goals_from_goal_response(
     response_body: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Normalise data.goal (dict with numeric keys or list) into a flat list."""
+    """Normalise data.goal (dict with numeric keys, list of goals, or list of
+    user-wrappers with ``people_goals``) into a flat list of goal dicts."""
     goal_data = response_body.get("goal", {})
     match goal_data:
         case dict():
             return [v for k, v in goal_data.items() if k.isdigit() and isinstance(v, dict)]
         case list():
-            return goal_data
+            goals: list[dict[str, Any]] = []
+            for item in goal_data:
+                if not isinstance(item, dict):
+                    continue
+                if isinstance(people_goals := item.get("people_goals"), list):
+                    goals.extend(g for g in people_goals if isinstance(g, dict))
+                elif "goal_id" in item:
+                    goals.append(item)
+            return goals
         case _:
             return []
 
@@ -177,7 +183,6 @@ def _current_year_start() -> int:
     """Get Unix timestamp for Jan 1 of the current year."""
     now = datetime.now(timezone.utc)
     return int(datetime(now.year, 1, 1, tzinfo=timezone.utc).timestamp())
-
 
 
 async def get_objectives(
@@ -299,10 +304,7 @@ async def _get_objective_ids_from_metrics(
                 continue
 
     year_start = _current_year_start()
-    current_year_metrics = [
-        m for m in all_metrics
-        if int(m.get("target_date") or 0) >= year_start
-    ]
+    current_year_metrics = [m for m in all_metrics if int(m.get("target_date") or 0) >= year_start]
 
     goal_ids: set[int] = set()
     for m in current_year_metrics:
@@ -387,10 +389,12 @@ async def get_my_objectives(
             else:
                 objectives.append(detail)
         except UserError:
-            skipped.append({
-                "objective_id": validated_oid,
-                "error": "Not accessible (may be archived or from a prior year)",
-            })
+            skipped.append(
+                {
+                    "objective_id": validated_oid,
+                    "error": "Not accessible (may be archived or from a prior year)",
+                }
+            )
 
     result: dict[str, Any] = {"objectives": objectives}
     if skipped:
@@ -423,10 +427,7 @@ async def get_my_key_results(
 
     if not include_prior_years:
         year_start = _current_year_start()
-        metrics = [
-            m for m in metrics
-            if int(m.get("target_date") or 0) >= year_start
-        ]
+        metrics = [m for m in metrics if int(m.get("target_date") or 0) >= year_start]
 
     formatted = [_format_metric(m) for m in metrics]
 
@@ -463,11 +464,7 @@ async def get_user_key_results(
     metric_body = response.get("data", {})
 
     if isinstance(metric_body, dict):
-        metrics = (
-            metric_body.get("metric")
-            or metric_body.get("user", {}).get("metric")
-            or []
-        )
+        metrics = metric_body.get("metric") or metric_body.get("user", {}).get("metric") or []
     else:
         metrics = []
 
@@ -476,10 +473,7 @@ async def get_user_key_results(
 
     if not include_prior_years:
         year_start = _current_year_start()
-        metrics = [
-            m for m in metrics
-            if int(m.get("target_date") or 0) >= year_start
-        ]
+        metrics = [m for m in metrics if int(m.get("target_date") or 0) >= year_start]
 
     formatted = [_format_metric(m) for m in metrics]
 
