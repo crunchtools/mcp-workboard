@@ -28,8 +28,8 @@ class Config:
             try:
                 with open(token_file) as f:
                     token = f.read().strip()
-            except (OSError, IOError) as e:
-                raise ConfigurationError(f"Failed to read token from {token_file}: {e}")
+            except OSError as e:
+                raise ConfigurationError(f"Failed to read token from {token_file}: {e}") from e
         else:
             token = os.environ.get("WORKBOARD_API_TOKEN")
         if not token:
@@ -64,7 +64,6 @@ class Config:
     def __str__(self) -> str:
         """Safe str that never exposes the token."""
         return "Config(token=***)"
-
 
 
 _config: Config | None = None
