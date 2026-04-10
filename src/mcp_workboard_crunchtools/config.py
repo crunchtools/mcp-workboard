@@ -23,6 +23,7 @@ class Config:
         Raises:
             ConfigurationError: If required environment variables are missing.
         """
+        token: str | None = None
         token_file = os.environ.get("WORKBOARD_API_TOKEN_FILE")
         if token_file:
             try:

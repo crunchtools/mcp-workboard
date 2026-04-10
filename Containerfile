@@ -1,5 +1,5 @@
 # MCP WorkBoard CrunchTools Container
-# Built on Hummingbird Python image (Red Hat UBI-based) for enterprise security
+# Multi-stage build: compile in python:3.14-slim, run in Hummingbird (distroless).
 #
 # Build:
 #   podman build -t quay.io/crunchtools/mcp-workboard .
@@ -12,12 +12,20 @@
 #     --env WORKBOARD_API_TOKEN=your_token \
 #     -- podman run -i --rm -e WORKBOARD_API_TOKEN quay.io/crunchtools/mcp-workboard
 
-# Use Hummingbird Python image (Red Hat UBI-based with Python pre-installed)
+# --- Build stage (has /bin/sh, pip, etc.) ---
+FROM python:3.14-slim AS builder
+
+WORKDIR /build
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir . \
+    && python -c "from mcp_workboard_crunchtools import main; print('Installation verified')"
+
+# --- Runtime stage (Hummingbird distroless — no shell on amd64) ---
 FROM quay.io/hummingbird/python:latest
 
-# Labels for container metadata
 LABEL name="mcp-workboard-crunchtools" \
-      version="0.6.1" \
+      version="0.7.0" \
       summary="Secure MCP server for WorkBoard OKR and strategy execution" \
       description="A security-focused MCP server for WorkBoard built on Red Hat UBI" \
       maintainer="crunchtools.com" \
@@ -28,18 +36,9 @@ LABEL name="mcp-workboard-crunchtools" \
       org.opencontainers.image.description="Secure MCP server for WorkBoard OKR and strategy execution" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
-# Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
-
-# Install the package and dependencies
-RUN pip install --no-cache-dir .
-
-# Verify installation
-RUN python -c "from mcp_workboard_crunchtools import main; print('Installation verified')"
+COPY --from=builder /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
 
 # Default: stdio transport (use -i with podman run)
 # HTTP:    --transport streamable-http (use -d -p 8000:8000 with podman run)
