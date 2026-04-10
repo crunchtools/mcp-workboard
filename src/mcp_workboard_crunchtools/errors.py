@@ -51,6 +51,13 @@ class InvalidWorkstreamIdError(UserError):
         super().__init__("Invalid workstream_id format. Expected positive integer.")
 
 
+class InvalidActivityIdError(UserError):
+    """Invalid activity ID format."""
+
+    def __init__(self) -> None:
+        super().__init__("Invalid activity_id format. Expected positive integer.")
+
+
 SAFE_ID_MAX_LENGTH = 20
 
 

@@ -21,10 +21,10 @@ class TestToolRegistration:
         assert mcp is not None
 
     def test_tool_count(self) -> None:
-        """Server should have exactly 18 tools registered."""
+        """Server should have exactly 22 tools registered."""
         from mcp_workboard_crunchtools.tools import __all__
 
-        assert len(__all__) == 18
+        assert len(__all__) == 22
 
     def test_imports(self) -> None:
         """All tool functions should be importable."""
@@ -69,6 +69,7 @@ class TestErrorSafety:
         """All errors should inherit from UserError."""
         from mcp_workboard_crunchtools.errors import (
             ConfigurationError,
+            InvalidActivityIdError,
             InvalidMetricIdError,
             InvalidObjectiveIdError,
             InvalidUserIdError,
@@ -86,6 +87,7 @@ class TestErrorSafety:
         assert issubclass(InvalidObjectiveIdError, UserError)
         assert issubclass(InvalidMetricIdError, UserError)
         assert issubclass(InvalidWorkstreamIdError, UserError)
+        assert issubclass(InvalidActivityIdError, UserError)
         assert issubclass(NotFoundError, UserError)
         assert issubclass(PermissionDeniedError, UserError)
         assert issubclass(RateLimitError, UserError)
@@ -182,7 +184,6 @@ class TestConfigSafety:
                 os.environ["WORKBOARD_API_TOKEN"] = token
 
 
-
 class TestUserTools:
     """Tests for user tools with mocked API responses."""
 
@@ -191,9 +192,11 @@ class TestUserTools:
         """get_user should return user data."""
         from mcp_workboard_crunchtools.tools import get_user
 
-        resp = _mock_response(json_data={
-            "data": {"user": {"user_id": "12345", "first_name": "Scott"}},
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {"user": {"user_id": "12345", "first_name": "Scott"}},
+            }
+        )
 
         with _patch_client(resp):
             result = await get_user()
@@ -205,9 +208,11 @@ class TestUserTools:
         """get_user with user_id should fetch specific user."""
         from mcp_workboard_crunchtools.tools import get_user
 
-        resp = _mock_response(json_data={
-            "data": {"user": {"user_id": "99", "first_name": "Gunnar"}},
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {"user": {"user_id": "99", "first_name": "Gunnar"}},
+            }
+        )
 
         with _patch_client(resp):
             result = await get_user(user_id=99)
@@ -219,12 +224,14 @@ class TestUserTools:
         """list_users should return users list."""
         from mcp_workboard_crunchtools.tools import list_users
 
-        resp = _mock_response(json_data={
-            "data": [
-                {"user_id": "1", "first_name": "Alice"},
-                {"user_id": "2", "first_name": "Bob"},
-            ],
-        })
+        resp = _mock_response(
+            json_data={
+                "data": [
+                    {"user_id": "1", "first_name": "Alice"},
+                    {"user_id": "2", "first_name": "Bob"},
+                ],
+            }
+        )
 
         with _patch_client(resp):
             result = await list_users()
@@ -236,9 +243,11 @@ class TestUserTools:
         """create_user should post and return created user."""
         from mcp_workboard_crunchtools.tools import create_user
 
-        resp = _mock_response(json_data={
-            "data": {"user": {"user_id": "100", "first_name": "New"}},
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {"user": {"user_id": "100", "first_name": "New"}},
+            }
+        )
 
         with _patch_client(resp):
             result = await create_user(
@@ -254,9 +263,11 @@ class TestUserTools:
         """update_user should put and return updated user."""
         from mcp_workboard_crunchtools.tools import update_user
 
-        resp = _mock_response(json_data={
-            "data": {"user": {"user_id": "42", "first_name": "Updated"}},
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {"user": {"user_id": "42", "first_name": "Updated"}},
+            }
+        )
 
         with _patch_client(resp):
             result = await update_user(user_id=42, first_name="Updated")
@@ -272,13 +283,15 @@ class TestTeamTools:
         """get_teams should return formatted team list."""
         from mcp_workboard_crunchtools.tools import get_teams
 
-        resp = _mock_response(json_data={
-            "data": {
-                "teams": [
-                    {"team_id": 10, "team_name": "Engineering", "team_owner": 1},
-                ],
-            },
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "teams": [
+                        {"team_id": 10, "team_name": "Engineering", "team_owner": 1},
+                    ],
+                },
+            }
+        )
 
         with _patch_client(resp):
             result = await get_teams()
@@ -292,16 +305,23 @@ class TestTeamTools:
         """get_team_members should return formatted member list."""
         from mcp_workboard_crunchtools.tools import get_team_members
 
-        resp = _mock_response(json_data={
-            "data": {
-                "team": {
-                    "team_name": "Engineering",
-                    "team_members": [
-                        {"id": 1, "first_name": "Alice", "last_name": "Smith", "email": "a@ex.com"},
-                    ],
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "team": {
+                        "team_name": "Engineering",
+                        "team_members": [
+                            {
+                                "id": 1,
+                                "first_name": "Alice",
+                                "last_name": "Smith",
+                                "email": "a@ex.com",
+                            },
+                        ],
+                    },
                 },
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_team_members(team_id=10)
@@ -320,20 +340,22 @@ class TestObjectiveTools:
         """get_objectives should return formatted objectives."""
         from mcp_workboard_crunchtools.tools import get_objectives
 
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "goal": {
-                    "0": {
-                        "goal_id": 100,
-                        "goal_name": "Ship v1",
-                        "goal_progress": "75",
-                        "goal_metrics": [],
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "goal": {
+                        "0": {
+                            "goal_id": 100,
+                            "goal_name": "Ship v1",
+                            "goal_progress": "75",
+                            "goal_metrics": [],
+                        },
                     },
+                    "metric": [],
                 },
-                "metric": [],
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_objectives(user_id=42)
@@ -347,27 +369,29 @@ class TestObjectiveTools:
         """get_objective_details should return single objective with KRs."""
         from mcp_workboard_crunchtools.tools import get_objective_details
 
-        resp = _mock_response(json_data={
-            "data": {
-                "user": {
-                    "goal": {
-                        "goal_id": 200,
-                        "goal_name": "Retention",
-                        "goal_progress": "50",
-                        "goal_metrics": [
-                            {
-                                "metric_id": 300,
-                                "metric_name": "NPS Score",
-                                "metric_target": "80",
-                                "metric_achieve_target": "40",
-                                "metric_unit": {"name": "Number"},
-                            },
-                        ],
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "user": {
+                        "goal": {
+                            "goal_id": 200,
+                            "goal_name": "Retention",
+                            "goal_progress": "50",
+                            "goal_metrics": [
+                                {
+                                    "metric_id": 300,
+                                    "metric_name": "NPS Score",
+                                    "metric_target": "80",
+                                    "metric_achieve_target": "40",
+                                    "metric_unit": {"name": "Number"},
+                                },
+                            ],
+                        },
                     },
+                    "metric": [],
                 },
-                "metric": [],
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_objective_details(user_id=42, objective_id=200)
@@ -381,28 +405,34 @@ class TestObjectiveTools:
         """get_my_objectives should auto-discover from metrics."""
         from mcp_workboard_crunchtools.tools import get_my_objectives
 
-        user_resp = _mock_response(json_data={
-            "data": {"user": {"user_id": "42"}},
-        })
-        metric_resp = _mock_response(json_data={
-            "data": {
-                "metric": [
-                    {"metric_id": 10, "metric_goal_id": 100, "target_date": "2000000000"},
-                ],
-            },
-        })
-        goal_resp = _mock_response(json_data={
-            "data": {
-                "user": {
-                    "goal": {
-                        "goal_id": 100,
-                        "goal_name": "My OKR",
-                        "goal_progress": "60",
-                        "goal_metrics": [],
+        user_resp = _mock_response(
+            json_data={
+                "data": {"user": {"user_id": "42"}},
+            }
+        )
+        metric_resp = _mock_response(
+            json_data={
+                "data": {
+                    "metric": [
+                        {"metric_id": 10, "metric_goal_id": 100, "target_date": "2000000000"},
+                    ],
+                },
+            }
+        )
+        goal_resp = _mock_response(
+            json_data={
+                "data": {
+                    "user": {
+                        "goal": {
+                            "goal_id": 100,
+                            "goal_name": "My OKR",
+                            "goal_progress": "60",
+                            "goal_metrics": [],
+                        },
                     },
                 },
-            },
-        })
+            }
+        )
 
         import os
 
@@ -438,9 +468,11 @@ class TestObjectiveTools:
         """create_objective should post and return created objective."""
         from mcp_workboard_crunchtools.tools import create_objective
 
-        resp = _mock_response(json_data={
-            "data": {"goal": {"goal_id": 500, "goal_name": "New Goal"}},
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {"goal": {"goal_id": 500, "goal_name": "New Goal"}},
+            }
+        )
 
         with _patch_client(resp):
             result = await create_objective(
@@ -461,20 +493,22 @@ class TestKeyResultTools:
         """get_my_key_results should return formatted metrics."""
         from mcp_workboard_crunchtools.tools import get_my_key_results
 
-        resp = _mock_response(json_data={
-            "data": {
-                "metric": [
-                    {
-                        "metric_id": 10,
-                        "metric_name": "Revenue",
-                        "metric_target": "1000000",
-                        "metric_achieve_target": "750000",
-                        "metric_unit": {"name": "Currency"},
-                        "target_date": "2000000000",
-                    },
-                ],
-            },
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "metric": [
+                        {
+                            "metric_id": 10,
+                            "metric_name": "Revenue",
+                            "metric_target": "1000000",
+                            "metric_achieve_target": "750000",
+                            "metric_unit": {"name": "Currency"},
+                            "target_date": "2000000000",
+                        },
+                    ],
+                },
+            }
+        )
 
         with _patch_client(resp):
             result = await get_my_key_results()
@@ -489,20 +523,22 @@ class TestKeyResultTools:
         """get_user_key_results should return metrics for a specific user."""
         from mcp_workboard_crunchtools.tools import get_user_key_results
 
-        resp = _mock_response(json_data={
-            "data": {
-                "metric": [
-                    {
-                        "metric_id": 20,
-                        "metric_name": "Customers",
-                        "metric_target": "100",
-                        "metric_achieve_target": "60",
-                        "metric_unit": {"name": "Number"},
-                        "target_date": "2000000000",
-                    },
-                ],
-            },
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "metric": [
+                        {
+                            "metric_id": 20,
+                            "metric_name": "Customers",
+                            "metric_target": "100",
+                            "metric_achieve_target": "60",
+                            "metric_unit": {"name": "Number"},
+                            "target_date": "2000000000",
+                        },
+                    ],
+                },
+            }
+        )
 
         with _patch_client(resp):
             result = await get_user_key_results(user_id=42)
@@ -515,20 +551,24 @@ class TestKeyResultTools:
         """update_key_result should put and return updated metric."""
         from mcp_workboard_crunchtools.tools import update_key_result
 
-        metric_list_resp = _mock_response(json_data={
-            "data": {
-                "metric": [
-                    {
-                        "metric_id": 10,
-                        "metric_name": "Revenue",
-                        "metric_achieve_target": "50",
-                    },
-                ],
-            },
-        })
-        update_resp = _mock_response(json_data={
-            "data": {"metric": {"metric_id": 10, "metric_achieve_target": "75"}},
-        })
+        metric_list_resp = _mock_response(
+            json_data={
+                "data": {
+                    "metric": [
+                        {
+                            "metric_id": 10,
+                            "metric_name": "Revenue",
+                            "metric_achieve_target": "50",
+                        },
+                    ],
+                },
+            }
+        )
+        update_resp = _mock_response(
+            json_data={
+                "data": {"metric": {"metric_id": 10, "metric_achieve_target": "75"}},
+            }
+        )
 
         import os
 
@@ -563,11 +603,52 @@ class TestWorkstreamTools:
         """get_workstreams should return formatted workstream list."""
         from mcp_workboard_crunchtools.tools import get_workstreams
 
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": [
-                    {
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": [
+                        {
+                            "ws_id": "100",
+                            "ws_name": "Q1 Sprint",
+                            "ws_objective": "Ship features",
+                            "ws_owner": "42",
+                            "ws_lead": "43",
+                            "ws_status": "active",
+                            "ws_type": "team",
+                            "ws_pace": "steady",
+                            "ws_health": "good",
+                            "ws_priority": "p1",
+                            "ws_progress": "50",
+                            "ws_start_date": "2026-01-01",
+                            "ws_target_date": "2026-03-31",
+                            "ws_completion_date": None,
+                            "ws_team_id": "10",
+                            "ws_team_name": "Engineering",
+                        },
+                    ],
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_workstreams()
+
+        assert "workstreams" in result
+        assert len(result["workstreams"]) == 1
+        assert result["workstreams"][0]["name"] == "Q1 Sprint"
+        assert result["workstreams"][0]["health"] == "good"
+
+    @pytest.mark.asyncio
+    async def test_get_workstreams_by_id(self) -> None:
+        """get_workstreams with ws_id should return a single workstream."""
+        from mcp_workboard_crunchtools.tools import get_workstreams
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
                         "ws_id": "100",
                         "ws_name": "Q1 Sprint",
                         "ws_objective": "Ship features",
@@ -585,46 +666,9 @@ class TestWorkstreamTools:
                         "ws_team_id": "10",
                         "ws_team_name": "Engineering",
                     },
-                ],
-            },
-        })
-
-        with _patch_client(resp):
-            result = await get_workstreams()
-
-        assert "workstreams" in result
-        assert len(result["workstreams"]) == 1
-        assert result["workstreams"][0]["name"] == "Q1 Sprint"
-        assert result["workstreams"][0]["health"] == "good"
-
-    @pytest.mark.asyncio
-    async def test_get_workstreams_by_id(self) -> None:
-        """get_workstreams with ws_id should return a single workstream."""
-        from mcp_workboard_crunchtools.tools import get_workstreams
-
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": {
-                    "ws_id": "100",
-                    "ws_name": "Q1 Sprint",
-                    "ws_objective": "Ship features",
-                    "ws_owner": "42",
-                    "ws_lead": "43",
-                    "ws_status": "active",
-                    "ws_type": "team",
-                    "ws_pace": "steady",
-                    "ws_health": "good",
-                    "ws_priority": "p1",
-                    "ws_progress": "50",
-                    "ws_start_date": "2026-01-01",
-                    "ws_target_date": "2026-03-31",
-                    "ws_completion_date": None,
-                    "ws_team_id": "10",
-                    "ws_team_name": "Engineering",
                 },
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_workstreams(ws_id=100)
@@ -637,57 +681,59 @@ class TestWorkstreamTools:
         """get_workstream_activities should return workstream with action items."""
         from mcp_workboard_crunchtools.tools import get_workstream_activities
 
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": {
-                    "ws_id": "100",
-                    "ws_name": "Q1 Sprint",
-                    "ws_objective": "Ship features",
-                    "ws_owner": "42",
-                    "ws_lead": "43",
-                    "ws_status": "active",
-                    "ws_type": "team",
-                    "ws_pace": "steady",
-                    "ws_health": "good",
-                    "ws_priority": "p1",
-                    "ws_progress": "50",
-                    "ws_start_date": "2026-01-01",
-                    "ws_target_date": "2026-03-31",
-                    "ws_completion_date": None,
-                    "ws_team_id": "10",
-                    "ws_team_name": "Engineering",
-                    "ws_activity": {
-                        "activity": [
-                            {
-                                "ai_id": "500",
-                                "ai_description": "Write design doc",
-                                "ai_state": "open",
-                                "ai_priority": "p1",
-                                "ai_effort": "medium",
-                                "ai_due_date": "2026-02-15",
-                                "ai_owner": "alice@example.com",
-                                "ai_created_by": "bob@example.com",
-                                "ai_created_at": "2026-01-10",
-                                "ai_completed_at": None,
-                                "ai_url": "https://workboard.com/ai/500",
-                                "ai_comments": [
-                                    {
-                                        "comment_id": "1",
-                                        "comment": "Started draft",
-                                        "comment_owner": "alice@example.com",
-                                        "comment_timestamp": "2026-01-12",
-                                    },
-                                ],
-                                "ai_sub_actions": [],
-                                "ai_files": [],
-                            },
-                        ],
-                        "activity_count": 1,
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "100",
+                        "ws_name": "Q1 Sprint",
+                        "ws_objective": "Ship features",
+                        "ws_owner": "42",
+                        "ws_lead": "43",
+                        "ws_status": "active",
+                        "ws_type": "team",
+                        "ws_pace": "steady",
+                        "ws_health": "good",
+                        "ws_priority": "p1",
+                        "ws_progress": "50",
+                        "ws_start_date": "2026-01-01",
+                        "ws_target_date": "2026-03-31",
+                        "ws_completion_date": None,
+                        "ws_team_id": "10",
+                        "ws_team_name": "Engineering",
+                        "ws_activity": {
+                            "activity": [
+                                {
+                                    "ai_id": "500",
+                                    "ai_description": "Write design doc",
+                                    "ai_state": "open",
+                                    "ai_priority": "p1",
+                                    "ai_effort": "medium",
+                                    "ai_due_date": "2026-02-15",
+                                    "ai_owner": "alice@example.com",
+                                    "ai_created_by": "bob@example.com",
+                                    "ai_created_at": "2026-01-10",
+                                    "ai_completed_at": None,
+                                    "ai_url": "https://workboard.com/ai/500",
+                                    "ai_comments": [
+                                        {
+                                            "comment_id": "1",
+                                            "comment": "Started draft",
+                                            "comment_owner": "alice@example.com",
+                                            "comment_timestamp": "2026-01-12",
+                                        },
+                                    ],
+                                    "ai_sub_actions": [],
+                                    "ai_files": [],
+                                },
+                            ],
+                            "activity_count": 1,
+                        },
                     },
                 },
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_workstream_activities(ws_id=100)
@@ -705,38 +751,40 @@ class TestWorkstreamTools:
         """get_team_workstreams should return workstreams for a team."""
         from mcp_workboard_crunchtools.tools import get_team_workstreams
 
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "team": {
-                    "team_id": "10",
-                    "team_name": "Engineering",
-                    "team_workstream": {
-                        "workstream_count": "1",
-                        "workstream": [
-                            {
-                                "ws_id": "100",
-                                "ws_name": "Q1 Sprint",
-                                "ws_objective": "Ship features",
-                                "ws_owner": "42",
-                                "ws_lead": "43",
-                                "ws_status": "active",
-                                "ws_type": "team",
-                                "ws_pace": "steady",
-                                "ws_health": "good",
-                                "ws_priority": "p1",
-                                "ws_progress": "50",
-                                "ws_start_date": "2026-01-01",
-                                "ws_target_date": "2026-03-31",
-                                "ws_completion_date": None,
-                                "ws_team_id": "10",
-                                "ws_team_name": "Engineering",
-                            },
-                        ],
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "team": {
+                        "team_id": "10",
+                        "team_name": "Engineering",
+                        "team_workstream": {
+                            "workstream_count": "1",
+                            "workstream": [
+                                {
+                                    "ws_id": "100",
+                                    "ws_name": "Q1 Sprint",
+                                    "ws_objective": "Ship features",
+                                    "ws_owner": "42",
+                                    "ws_lead": "43",
+                                    "ws_status": "active",
+                                    "ws_type": "team",
+                                    "ws_pace": "steady",
+                                    "ws_health": "good",
+                                    "ws_priority": "p1",
+                                    "ws_progress": "50",
+                                    "ws_start_date": "2026-01-01",
+                                    "ws_target_date": "2026-03-31",
+                                    "ws_completion_date": None,
+                                    "ws_team_id": "10",
+                                    "ws_team_name": "Engineering",
+                                },
+                            ],
+                        },
                     },
                 },
-            },
-        })
+            }
+        )
 
         with _patch_client(resp):
             result = await get_team_workstreams(team_id=10)
@@ -751,12 +799,14 @@ class TestWorkstreamTools:
         """create_workstream should post and return created workstream."""
         from mcp_workboard_crunchtools.tools import create_workstream
 
-        resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": [{"ws_id": "200", "ws_name": "New WS"}],
-            },
-        })
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": [{"ws_id": "200", "ws_name": "New WS"}],
+                },
+            }
+        )
 
         with _patch_client(resp):
             result = await create_workstream(
@@ -773,26 +823,30 @@ class TestWorkstreamTools:
         """update_workstream should read then put and return updated workstream."""
         from mcp_workboard_crunchtools.tools import update_workstream
 
-        read_resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": {
-                    "ws_id": "100",
-                    "ws_name": "Q1 Sprint",
-                    "ws_health": "good",
+        read_resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "100",
+                        "ws_name": "Q1 Sprint",
+                        "ws_health": "good",
+                    },
                 },
-            },
-        })
-        update_resp = _mock_response(json_data={
-            "data": {
-                "totalCount": 1,
-                "workstream": {
-                    "ws_id": "100",
-                    "ws_name": "Q1 Sprint",
-                    "ws_health": "risk",
+            }
+        )
+        update_resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "100",
+                        "ws_name": "Q1 Sprint",
+                        "ws_health": "risk",
+                    },
                 },
-            },
-        })
+            }
+        )
 
         import os
 
@@ -817,6 +871,160 @@ class TestWorkstreamTools:
             result = await update_workstream(ws_id=100, ws_health="risk")
 
         assert "workstream" in result
+
+
+class TestActivityTools:
+    """Tests for activity tools with mocked API responses."""
+
+    @pytest.mark.asyncio
+    async def test_list_activities(self) -> None:
+        """list_activities should return formatted activity list."""
+        from mcp_workboard_crunchtools.tools import list_activities
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": [
+                        {
+                            "ai_id": "500",
+                            "ai_description": "Write design doc",
+                            "ai_state": "doing",
+                            "ai_priority": "high",
+                            "ai_effort": "medium",
+                            "ai_due_date": "1800000000",
+                            "ai_owner": "alice@example.com",
+                            "ai_created_by": "bob@example.com",
+                            "ai_created_at": "2026-01-10",
+                            "ai_completed_at": None,
+                            "ai_url": "https://workboard.com/ai/500",
+                            "ai_workstream": "100",
+                            "ai_workstream_name": "Q1 Sprint",
+                            "ai_team": "10",
+                        },
+                    ],
+                    "activity_count": 1,
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await list_activities()
+
+        assert "activities" in result
+        assert len(result["activities"]) == 1
+        assert result["activities"][0]["description"] == "Write design doc"
+        assert result["activities"][0]["state"] == "doing"
+
+    @pytest.mark.asyncio
+    async def test_get_activity(self) -> None:
+        """get_activity should return a single action item."""
+        from mcp_workboard_crunchtools.tools import get_activity
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": {
+                        "ai_id": "500",
+                        "ai_description": "Write design doc",
+                        "ai_state": "doing",
+                        "ai_priority": "high",
+                        "ai_effort": "medium",
+                        "ai_due_date": "1800000000",
+                        "ai_owner": "alice@example.com",
+                        "ai_created_by": "bob@example.com",
+                        "ai_created_at": "2026-01-10",
+                        "ai_completed_at": None,
+                        "ai_url": "https://workboard.com/ai/500",
+                        "ai_workstream": "100",
+                        "ai_workstream_name": "Q1 Sprint",
+                        "ai_team": "10",
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_activity(activity_id=500)
+
+        assert "activity" in result
+        assert result["activity"]["description"] == "Write design doc"
+
+    @pytest.mark.asyncio
+    async def test_create_activity(self) -> None:
+        """create_activity should post and return created action item."""
+        from mcp_workboard_crunchtools.tools import create_activity
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": {
+                        "ai_id": "501",
+                        "ai_description": "Review PR",
+                        "ai_state": "next",
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await create_activity(
+                ai_description="Review PR",
+                ai_workstream="100",
+                ai_state="next",
+            )
+
+        assert "activity" in result
+
+    @pytest.mark.asyncio
+    async def test_update_activity(self) -> None:
+        """update_activity should read then put and return updated action item."""
+        from mcp_workboard_crunchtools.tools import update_activity
+
+        read_resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": {
+                        "ai_id": "500",
+                        "ai_description": "Write design doc",
+                        "ai_state": "doing",
+                    },
+                },
+            }
+        )
+        update_resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": {
+                        "ai_id": "500",
+                        "ai_state": "done",
+                    },
+                },
+            }
+        )
+
+        import os
+
+        import mcp_workboard_crunchtools.client as client_mod
+        import mcp_workboard_crunchtools.config as config_mod
+
+        client_mod._client = None
+        config_mod._config = None
+        os.environ.setdefault("WORKBOARD_API_TOKEN", "test-mock-token")
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+
+        async def side_effect(**kwargs):  # type: ignore[no-untyped-def]
+            method = kwargs.get("method", "GET")
+            if method == "PUT":
+                return update_resp
+            return read_resp
+
+        mock_http.request = AsyncMock(side_effect=side_effect)
+
+        with patch.object(httpx, "AsyncClient", return_value=mock_http):
+            result = await update_activity(activity_id=500, ai_state="done")
+
+        assert "activity" in result
 
 
 class TestClientErrorHandling:

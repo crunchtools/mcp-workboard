@@ -44,7 +44,7 @@ async def get_teams() -> dict[str, Any]:
             or []
         )
         if isinstance(teams, dict):
-                teams = list(teams.values())
+            teams = list(teams.values())
     else:
         teams = []
 
@@ -57,11 +57,7 @@ async def get_team_members(team_id: int) -> dict[str, Any]:
     response = await client.get(f"/team/{team_id}/user")
 
     if isinstance(response, dict):
-        team_data = (
-            response.get("data", {}).get("team")
-            or response.get("team")
-            or {}
-        )
+        team_data = response.get("data", {}).get("team") or response.get("team") or {}
         members = team_data.get("team_members", [])
         team_name = team_data.get("team_name", "")
     else:

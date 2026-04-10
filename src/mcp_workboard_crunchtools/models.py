@@ -5,6 +5,7 @@ import re
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from .errors import (
+    InvalidActivityIdError,
     InvalidMetricIdError,
     InvalidObjectiveIdError,
     InvalidUserIdError,
@@ -47,6 +48,13 @@ def validate_workstream_id(workstream_id: int) -> int:
     return workstream_id
 
 
+def validate_activity_id(activity_id: int) -> int:
+    """Validate an activity ID is a positive integer."""
+    if not isinstance(activity_id, int) or activity_id <= 0:
+        raise InvalidActivityIdError
+    return activity_id
+
+
 class CreateUserInput(BaseModel):
     """Validated input for creating a new WorkBoard user."""
 
@@ -58,9 +66,7 @@ class CreateUserInput(BaseModel):
     last_name: str = Field(
         ..., min_length=1, max_length=MAX_NAME_LENGTH, description="User's last name"
     )
-    email: EmailStr = Field(
-        ..., description="User's email address"
-    )
+    email: EmailStr = Field(..., description="User's email address")
     designation: str | None = Field(
         default=None, max_length=MAX_NAME_LENGTH, description="User's job title or designation"
     )
@@ -80,9 +86,7 @@ class UpdateUserInput(BaseModel):
     last_name: str | None = Field(
         default=None, min_length=1, max_length=MAX_NAME_LENGTH, description="User's last name"
     )
-    email: EmailStr | None = Field(
-        default=None, description="User's email address"
-    )
+    email: EmailStr | None = Field(default=None, description="User's email address")
     designation: str | None = Field(
         default=None, max_length=MAX_NAME_LENGTH, description="User's job title or designation"
     )
@@ -100,7 +104,9 @@ class UpdateKeyResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     value: str = Field(
-        ..., min_length=1, max_length=MAX_VALUE_LENGTH,
+        ...,
+        min_length=1,
+        max_length=MAX_VALUE_LENGTH,
         description="Progress value (non-negative number)",
     )
     comment: str | None = Field(
@@ -134,20 +140,15 @@ class CreateObjectiveInput(BaseModel):
     owner: str = Field(
         ..., min_length=1, max_length=MAX_NAME_LENGTH, description="Owner email or user ID"
     )
-    start_date: str = Field(
-        ..., description="Start date in YYYY-MM-DD format"
-    )
-    target_date: str = Field(
-        ..., description="Target date in YYYY-MM-DD format"
-    )
+    start_date: str = Field(..., description="Start date in YYYY-MM-DD format")
+    target_date: str = Field(..., description="Target date in YYYY-MM-DD format")
     narrative: str | None = Field(
         default=None, max_length=MAX_NARRATIVE_LENGTH, description="Objective description"
     )
-    goal_type: str = Field(
-        default="1", description="1=Team, 2=Personal"
-    )
+    goal_type: str = Field(default="1", description="1=Team, 2=Personal")
     permission: str = Field(
-        default="internal,team", max_length=MAX_PERMISSION_LENGTH,
+        default="internal,team",
+        max_length=MAX_PERMISSION_LENGTH,
         description="Visibility setting",
     )
 
@@ -182,18 +183,25 @@ class CreateWorkstreamInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ws_name: str = Field(
-        ..., min_length=1, max_length=MAX_WORKSTREAM_NAME_LENGTH,
+        ...,
+        min_length=1,
+        max_length=MAX_WORKSTREAM_NAME_LENGTH,
         description="Name of the workstream",
     )
     ws_objective: str | None = Field(
-        default=None, max_length=MAX_WORKSTREAM_OBJECTIVE_LENGTH,
+        default=None,
+        max_length=MAX_WORKSTREAM_OBJECTIVE_LENGTH,
         description="Descriptive narrative or objective statement",
     )
     team_id: str = Field(
-        ..., min_length=1, description="Parent team ID",
+        ...,
+        min_length=1,
+        description="Parent team ID",
     )
     ws_owner: str = Field(
-        ..., min_length=1, description="User ID of the team manager or co-manager",
+        ...,
+        min_length=1,
+        description="User ID of the team manager or co-manager",
     )
 
 
@@ -206,23 +214,30 @@ class UpdateWorkstreamInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ws_name: str | None = Field(
-        default=None, min_length=1, max_length=MAX_WORKSTREAM_NAME_LENGTH,
+        default=None,
+        min_length=1,
+        max_length=MAX_WORKSTREAM_NAME_LENGTH,
         description="Name of the workstream",
     )
     ws_start_date: str | None = Field(
-        default=None, description="Start date (YYYY-MM-DD)",
+        default=None,
+        description="Start date (YYYY-MM-DD)",
     )
     ws_end_date: str | None = Field(
-        default=None, description="End date (YYYY-MM-DD)",
+        default=None,
+        description="End date (YYYY-MM-DD)",
     )
     ws_pace: str | None = Field(
-        default=None, description="Pace: slow, fast, or steady",
+        default=None,
+        description="Pace: slow, fast, or steady",
     )
     ws_health: str | None = Field(
-        default=None, description="Health: ok, good, or risk",
+        default=None,
+        description="Health: ok, good, or risk",
     )
     ws_priority: str | None = Field(
-        default=None, description="Priority: p1 through p5",
+        default=None,
+        description="Priority: p1 through p5",
     )
 
     @field_validator("ws_start_date", "ws_end_date")
@@ -256,3 +271,108 @@ class UpdateWorkstreamInput(BaseModel):
         if v is not None and v not in _VALID_PRIORITY:
             raise ValueError(f"ws_priority must be one of {sorted(_VALID_PRIORITY)}, got: {v!r}")
         return v
+
+
+MAX_ACTIVITY_DESCRIPTION_LENGTH = 500
+
+_VALID_AI_STATE = {"next", "doing", "done", "pause"}
+_VALID_AI_PRIORITY = {"low", "med", "high"}
+_VALID_AI_EFFORT = {"easy", "medium", "huge"}
+
+
+def _validate_ai_state(v: str | None) -> str | None:
+    """Validate activity state is one of the allowed values."""
+    if v is not None and v not in _VALID_AI_STATE:
+        raise ValueError(f"ai_state must be one of {sorted(_VALID_AI_STATE)}, got: {v!r}")
+    return v
+
+
+def _validate_ai_priority(v: str | None) -> str | None:
+    """Validate activity priority is one of the allowed values."""
+    if v is not None and v not in _VALID_AI_PRIORITY:
+        raise ValueError(f"ai_priority must be one of {sorted(_VALID_AI_PRIORITY)}, got: {v!r}")
+    return v
+
+
+def _validate_ai_effort(v: str | None) -> str | None:
+    """Validate activity effort is one of the allowed values."""
+    if v is not None and v not in _VALID_AI_EFFORT:
+        raise ValueError(f"ai_effort must be one of {sorted(_VALID_AI_EFFORT)}, got: {v!r}")
+    return v
+
+
+class CreateActivityInput(BaseModel):
+    """Validated input for creating a new action item (activity)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ai_description: str = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
+        description="Description of the action item",
+    )
+    ai_note: str | None = Field(default=None, description="Notes or body text for the action item")
+    ai_workstream: str | None = Field(default=None, min_length=1, description="Workstream ID")
+    ai_team: str | None = Field(default=None, min_length=1, description="Team ID")
+    ai_owner: str | None = Field(default=None, min_length=1, description="Owner user ID or email")
+    ai_state: str | None = Field(default=None, description="State: next, doing, done, or pause")
+    ai_priority: str | None = Field(default=None, description="Priority: low, med, or high")
+    ai_effort: str | None = Field(default=None, description="Effort: easy, medium, or huge")
+    ai_due_date: str | None = Field(
+        default=None, min_length=1, description="Due date as UNIX timestamp string"
+    )
+
+    @field_validator("ai_state")
+    @classmethod
+    def state_must_be_valid(cls, v: str | None) -> str | None:
+        return _validate_ai_state(v)
+
+    @field_validator("ai_priority")
+    @classmethod
+    def priority_must_be_valid_ai(cls, v: str | None) -> str | None:
+        return _validate_ai_priority(v)
+
+    @field_validator("ai_effort")
+    @classmethod
+    def effort_must_be_valid(cls, v: str | None) -> str | None:
+        return _validate_ai_effort(v)
+
+
+class UpdateActivityInput(BaseModel):
+    """Validated input for updating an existing action item.
+
+    All fields are optional — only provided fields will be sent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ai_description: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=MAX_ACTIVITY_DESCRIPTION_LENGTH,
+        description="Description of the action item",
+    )
+    ai_note: str | None = Field(default=None, description="Notes or body text for the action item")
+    ai_owner: str | None = Field(default=None, min_length=1, description="Owner user ID or email")
+    ai_state: str | None = Field(default=None, description="State: next, doing, done, or pause")
+    ai_priority: str | None = Field(default=None, description="Priority: low, med, or high")
+    ai_effort: str | None = Field(default=None, description="Effort: easy, medium, or huge")
+    ai_due_date: str | None = Field(
+        default=None, min_length=1, description="Due date as UNIX timestamp string"
+    )
+
+    @field_validator("ai_state")
+    @classmethod
+    def state_must_be_valid(cls, v: str | None) -> str | None:
+        return _validate_ai_state(v)
+
+    @field_validator("ai_priority")
+    @classmethod
+    def priority_must_be_valid_ai(cls, v: str | None) -> str | None:
+        return _validate_ai_priority(v)
+
+    @field_validator("ai_effort")
+    @classmethod
+    def effort_must_be_valid(cls, v: str | None) -> str | None:
+        return _validate_ai_effort(v)

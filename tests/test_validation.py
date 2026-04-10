@@ -4,16 +4,20 @@ import pytest
 from pydantic import ValidationError
 
 from mcp_workboard_crunchtools.errors import (
+    InvalidActivityIdError,
     InvalidMetricIdError,
     InvalidObjectiveIdError,
     InvalidUserIdError,
     InvalidWorkstreamIdError,
 )
 from mcp_workboard_crunchtools.models import (
+    CreateActivityInput,
     CreateUserInput,
     CreateWorkstreamInput,
+    UpdateActivityInput,
     UpdateUserInput,
     UpdateWorkstreamInput,
+    validate_activity_id,
     validate_metric_id,
     validate_objective_id,
     validate_user_id,
@@ -313,4 +317,121 @@ class TestUpdateWorkstreamInput:
             UpdateWorkstreamInput(
                 ws_health="good",
                 ws_label="hidden",  # type: ignore[call-arg]
+            )
+
+
+class TestActivityIdValidation:
+    """Tests for activity_id validation."""
+
+    def test_valid_activity_id(self) -> None:
+        """Valid positive integer should pass."""
+        assert validate_activity_id(500) == 500
+
+    def test_valid_activity_id_large(self) -> None:
+        """Large positive integer should pass."""
+        assert validate_activity_id(999999) == 999999
+
+    def test_invalid_activity_id_zero(self) -> None:
+        """Zero should fail."""
+        with pytest.raises(InvalidActivityIdError):
+            validate_activity_id(0)
+
+    def test_invalid_activity_id_negative(self) -> None:
+        """Negative integer should fail."""
+        with pytest.raises(InvalidActivityIdError):
+            validate_activity_id(-1)
+
+
+class TestCreateActivityInput:
+    """Tests for CreateActivityInput model."""
+
+    def test_valid_minimal(self) -> None:
+        """Minimal valid input (description only) should pass."""
+        ai = CreateActivityInput(ai_description="Write design doc")
+        assert ai.ai_description == "Write design doc"
+        assert ai.ai_workstream is None
+        assert ai.ai_state is None
+
+    def test_valid_full(self) -> None:
+        """Full valid input should pass."""
+        ai = CreateActivityInput(
+            ai_description="Review PR",
+            ai_workstream="100",
+            ai_team="10",
+            ai_owner="alice@example.com",
+            ai_state="next",
+            ai_priority="high",
+            ai_effort="easy",
+            ai_due_date="1800000000",
+        )
+        assert ai.ai_state == "next"
+        assert ai.ai_priority == "high"
+        assert ai.ai_effort == "easy"
+
+    def test_empty_description_rejected(self) -> None:
+        """Empty description should fail."""
+        with pytest.raises(ValidationError):
+            CreateActivityInput(ai_description="")
+
+    def test_invalid_state_rejected(self) -> None:
+        """Invalid state value should fail."""
+        with pytest.raises(ValidationError):
+            CreateActivityInput(ai_description="Task", ai_state="blocked")
+
+    def test_invalid_priority_rejected(self) -> None:
+        """Invalid priority value should fail."""
+        with pytest.raises(ValidationError):
+            CreateActivityInput(ai_description="Task", ai_priority="critical")
+
+    def test_invalid_effort_rejected(self) -> None:
+        """Invalid effort value should fail."""
+        with pytest.raises(ValidationError):
+            CreateActivityInput(ai_description="Task", ai_effort="gigantic")
+
+    def test_extra_fields_rejected(self) -> None:
+        """Extra fields should be rejected."""
+        with pytest.raises(ValidationError):
+            CreateActivityInput(
+                ai_description="Task",
+                ai_hidden=True,  # type: ignore[call-arg]
+            )
+
+
+class TestUpdateActivityInput:
+    """Tests for UpdateActivityInput model."""
+
+    def test_all_fields_none(self) -> None:
+        """All fields None should be valid (empty update)."""
+        update = UpdateActivityInput()
+        assert update.ai_description is None
+        assert update.ai_state is None
+
+    def test_partial_update(self) -> None:
+        """Partial update with only state should pass."""
+        update = UpdateActivityInput(ai_state="done")
+        assert update.ai_state == "done"
+        assert update.ai_description is None
+
+    def test_valid_state_values(self) -> None:
+        """All valid state values should pass."""
+        for state in ("next", "doing", "done", "pause"):
+            update = UpdateActivityInput(ai_state=state)
+            assert update.ai_state == state
+
+    def test_invalid_state_rejected(self) -> None:
+        """Invalid state value should fail."""
+        with pytest.raises(ValidationError):
+            UpdateActivityInput(ai_state="in_progress")
+
+    def test_invalid_priority_rejected(self) -> None:
+        """Invalid priority value should fail."""
+        with pytest.raises(ValidationError):
+            UpdateActivityInput(ai_priority="p1")
+
+    def test_extra_fields_rejected(self) -> None:
+        """Extra fields should be rejected."""
+        with pytest.raises(ValidationError):
+            UpdateActivityInput(
+                ai_state="done",
+                ai_hidden=True,  # type: ignore[call-arg]
             )
