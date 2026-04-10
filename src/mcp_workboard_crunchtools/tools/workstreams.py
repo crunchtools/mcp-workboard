@@ -236,9 +236,7 @@ async def get_team_workstreams(
         "team_id": team_id,
         "team_name": team_data.get("team_name", ""),
         "workstream_count": ws_section.get("workstream_count", "0"),
-        "workstreams": [
-            _format_workstream(ws) for ws in raw_ws if isinstance(ws, dict)
-        ],
+        "workstreams": [_format_workstream(ws) for ws in raw_ws if isinstance(ws, dict)],
     }
 
 

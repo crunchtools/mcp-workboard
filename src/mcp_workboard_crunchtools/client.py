@@ -101,9 +101,7 @@ class WorkBoardClient:
         try:
             parsed = response.json()
         except ValueError as e:
-            raise WorkBoardApiError(
-                response.status_code, f"Invalid JSON response: {e}"
-            ) from e
+            raise WorkBoardApiError(response.status_code, f"Invalid JSON response: {e}") from e
 
         if not response.is_success:
             self._handle_error_response(response.status_code, parsed)
@@ -112,9 +110,7 @@ class WorkBoardClient:
             return parsed
         return {"data": parsed}
 
-    def _handle_error_response(
-        self, status_code: int, error_body: dict[str, Any]
-    ) -> None:
+    def _handle_error_response(self, status_code: int, error_body: dict[str, Any]) -> None:
         """Handle error responses from the API."""
         error_msg = error_body.get("message", "Unknown error")
         if isinstance(error_msg, dict):
@@ -133,9 +129,7 @@ class WorkBoardClient:
             case _:
                 raise WorkBoardApiError(status_code, str(error_msg))
 
-    async def get(
-        self, path: str, params: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Make a GET request."""
         return await self._request("GET", path, params=params)
 
@@ -167,7 +161,6 @@ class WorkBoardClient:
     async def delete(self, path: str) -> dict[str, Any]:
         """Make a DELETE request."""
         return await self._request("DELETE", path)
-
 
 
 _client: WorkBoardClient | None = None
