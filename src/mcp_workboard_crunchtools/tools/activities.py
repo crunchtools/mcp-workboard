@@ -37,6 +37,11 @@ def _format_activity(ai: dict[str, Any]) -> dict[str, Any]:
         "team": ai.get("ai_team", ""),
     }
 
+    ai_column = ai.get("ai_column")
+    if isinstance(ai_column, dict):
+        formatted["column_id"] = ai_column.get("id", "")
+        formatted["column_name"] = ai_column.get("name", "")
+
     comments = ai.get("ai_comments", [])
     if isinstance(comments, list) and comments:
         formatted["comments"] = [
@@ -183,6 +188,7 @@ async def create_activity(
     ai_priority: str | None = None,
     ai_effort: str | None = None,
     ai_due_date: str | None = None,
+    ai_column: str | None = None,
 ) -> dict[str, Any]:
     """Create a new action item.
 
@@ -196,6 +202,7 @@ async def create_activity(
         ai_priority: Priority: low, med, or high.
         ai_effort: Effort estimate: easy, medium, or huge.
         ai_due_date: Due date as UNIX timestamp string.
+        ai_column: Custom Kanban column ID within the workstream.
 
     Returns:
         Created action item details.
@@ -210,6 +217,7 @@ async def create_activity(
         ai_priority=ai_priority,
         ai_effort=ai_effort,
         ai_due_date=ai_due_date,
+        ai_column=ai_column,
     )
 
     payload: dict[str, Any] = {"ai_description": validated.ai_description}
@@ -229,6 +237,8 @@ async def create_activity(
         payload["ai_effort"] = validated.ai_effort
     if validated.ai_due_date is not None:
         payload["ai_due_date"] = validated.ai_due_date
+    if validated.ai_column is not None:
+        payload["ai_column"] = validated.ai_column
 
     client = get_client()
     response = await client.post("/activity", json_data=payload)
@@ -254,6 +264,7 @@ async def update_activity(
     ai_priority: str | None = None,
     ai_effort: str | None = None,
     ai_due_date: str | None = None,
+    ai_column: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing action item.
 
@@ -269,6 +280,7 @@ async def update_activity(
         ai_priority: New priority: low, med, or high (optional).
         ai_effort: New effort: easy, medium, or huge (optional).
         ai_due_date: New due date as UNIX timestamp string (optional).
+        ai_column: Custom Kanban column ID within the workstream (optional).
 
     Returns:
         Updated action item details.
@@ -283,6 +295,7 @@ async def update_activity(
         ai_priority=ai_priority,
         ai_effort=ai_effort,
         ai_due_date=ai_due_date,
+        ai_column=ai_column,
     )
 
     client = get_client()
@@ -304,6 +317,8 @@ async def update_activity(
         payload["ai_effort"] = validated.ai_effort
     if validated.ai_due_date is not None:
         payload["ai_due_date"] = validated.ai_due_date
+    if validated.ai_column is not None:
+        payload["ai_column"] = validated.ai_column
 
     response = await client.put(f"/activity/{activity_id}", json_data=payload)
 

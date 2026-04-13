@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.7.0",
+    version="0.8.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -544,6 +544,7 @@ async def workboard_create_activity_tool(
     ai_priority: str | None = None,
     ai_effort: str | None = None,
     ai_due_date: str | None = None,
+    ai_column: str | None = None,
 ) -> dict[str, Any]:
     """Create a new action item (card) on a WorkBoard workstream.
 
@@ -561,6 +562,9 @@ async def workboard_create_activity_tool(
         ai_priority: Priority: low, med, or high (optional)
         ai_effort: Effort estimate: easy, medium, or huge (optional)
         ai_due_date: Due date as UNIX timestamp string (optional)
+        ai_column: Custom Kanban column ID to place the card in (optional).
+                   Workstreams can define custom columns within each state
+                   (e.g. "Homework", "Interlocks", "Active" within "doing").
 
     Returns:
         Created action item details
@@ -575,6 +579,7 @@ async def workboard_create_activity_tool(
         ai_priority=ai_priority,
         ai_effort=ai_effort,
         ai_due_date=ai_due_date,
+        ai_column=ai_column,
     )
 
 
@@ -588,6 +593,7 @@ async def workboard_update_activity_tool(
     ai_priority: str | None = None,
     ai_effort: str | None = None,
     ai_due_date: str | None = None,
+    ai_column: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing WorkBoard action item.
 
@@ -605,6 +611,8 @@ async def workboard_update_activity_tool(
         ai_priority: New priority: low, med, or high (optional)
         ai_effort: New effort: easy, medium, or huge (optional)
         ai_due_date: New due date as UNIX timestamp string (optional)
+        ai_column: Custom Kanban column ID to move the card to (optional).
+                   Workstreams can define custom columns within each state.
 
     Returns:
         Updated action item details
@@ -618,4 +626,5 @@ async def workboard_update_activity_tool(
         ai_priority=ai_priority,
         ai_effort=ai_effort,
         ai_due_date=ai_due_date,
+        ai_column=ai_column,
     )

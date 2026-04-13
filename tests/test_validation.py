@@ -363,10 +363,22 @@ class TestCreateActivityInput:
             ai_priority="high",
             ai_effort="easy",
             ai_due_date="1800000000",
+            ai_column="42",
         )
         assert ai.ai_state == "next"
         assert ai.ai_priority == "high"
         assert ai.ai_effort == "easy"
+        assert ai.ai_column == "42"
+
+    def test_ai_column_defaults_none(self) -> None:
+        """ai_column should default to None."""
+        ai = CreateActivityInput(ai_description="Task")
+        assert ai.ai_column is None
+
+    def test_ai_column_accepts_string(self) -> None:
+        """ai_column should accept any string value."""
+        ai = CreateActivityInput(ai_description="Task", ai_column="99")
+        assert ai.ai_column == "99"
 
     def test_empty_description_rejected(self) -> None:
         """Empty description should fail."""
@@ -427,6 +439,16 @@ class TestUpdateActivityInput:
         """Invalid priority value should fail."""
         with pytest.raises(ValidationError):
             UpdateActivityInput(ai_priority="p1")
+
+    def test_ai_column_defaults_none(self) -> None:
+        """ai_column should default to None."""
+        update = UpdateActivityInput()
+        assert update.ai_column is None
+
+    def test_ai_column_accepts_string(self) -> None:
+        """ai_column should accept any string value."""
+        update = UpdateActivityInput(ai_column="55")
+        assert update.ai_column == "55"
 
     def test_extra_fields_rejected(self) -> None:
         """Extra fields should be rejected."""

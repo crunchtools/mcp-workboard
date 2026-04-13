@@ -34,6 +34,11 @@ def _format_activity_item(ai: dict[str, Any]) -> dict[str, Any]:
         "url": ai.get("ai_url", ""),
     }
 
+    ai_column = ai.get("ai_column")
+    if isinstance(ai_column, dict):
+        formatted["column_id"] = ai_column.get("id", "")
+        formatted["column_name"] = ai_column.get("name", "")
+
     comments = ai.get("ai_comments", [])
     if isinstance(comments, list) and comments:
         formatted["comments"] = [

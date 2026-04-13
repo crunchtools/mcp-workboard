@@ -322,6 +322,9 @@ class CreateActivityInput(BaseModel):
     ai_due_date: str | None = Field(
         default=None, min_length=1, description="Due date as UNIX timestamp string"
     )
+    ai_column: str | None = Field(
+        default=None, description="Custom Kanban column ID within the workstream"
+    )
 
     @field_validator("ai_state")
     @classmethod
@@ -360,6 +363,9 @@ class UpdateActivityInput(BaseModel):
     ai_effort: str | None = Field(default=None, description="Effort: easy, medium, or huge")
     ai_due_date: str | None = Field(
         default=None, min_length=1, description="Due date as UNIX timestamp string"
+    )
+    ai_column: str | None = Field(
+        default=None, description="Custom Kanban column ID within the workstream"
     )
 
     @field_validator("ai_state")

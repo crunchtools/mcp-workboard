@@ -716,6 +716,7 @@ class TestWorkstreamTools:
                                     "ai_created_at": "2026-01-10",
                                     "ai_completed_at": None,
                                     "ai_url": "https://workboard.com/ai/500",
+                                    "ai_column": {"id": "15", "name": "Interlocks"},
                                     "ai_comments": [
                                         {
                                             "comment_id": "1",
@@ -744,6 +745,8 @@ class TestWorkstreamTools:
         assert "action_items" in ws
         assert len(ws["action_items"]) == 1
         assert ws["action_items"][0]["description"] == "Write design doc"
+        assert ws["action_items"][0]["column_id"] == "15"
+        assert ws["action_items"][0]["column_name"] == "Interlocks"
         assert len(ws["action_items"][0]["comments"]) == 1
 
     @pytest.mark.asyncio
@@ -900,6 +903,7 @@ class TestActivityTools:
                             "ai_workstream": "100",
                             "ai_workstream_name": "Q1 Sprint",
                             "ai_team": "10",
+                            "ai_column": {"id": "42", "name": "Homework"},
                         },
                     ],
                     "activity_count": 1,
@@ -914,6 +918,8 @@ class TestActivityTools:
         assert len(result["activities"]) == 1
         assert result["activities"][0]["description"] == "Write design doc"
         assert result["activities"][0]["state"] == "doing"
+        assert result["activities"][0]["column_id"] == "42"
+        assert result["activities"][0]["column_name"] == "Homework"
 
     @pytest.mark.asyncio
     async def test_get_activity(self) -> None:
@@ -938,6 +944,7 @@ class TestActivityTools:
                         "ai_workstream": "100",
                         "ai_workstream_name": "Q1 Sprint",
                         "ai_team": "10",
+                        "ai_column": {"id": "42", "name": "Homework"},
                     },
                 },
             }
@@ -948,6 +955,8 @@ class TestActivityTools:
 
         assert "activity" in result
         assert result["activity"]["description"] == "Write design doc"
+        assert result["activity"]["column_id"] == "42"
+        assert result["activity"]["column_name"] == "Homework"
 
     @pytest.mark.asyncio
     async def test_create_activity(self) -> None:
@@ -961,6 +970,7 @@ class TestActivityTools:
                         "ai_id": "501",
                         "ai_description": "Review PR",
                         "ai_state": "next",
+                        "ai_column": {"id": "7", "name": "Active"},
                     },
                 },
             }
@@ -974,6 +984,36 @@ class TestActivityTools:
             )
 
         assert "activity" in result
+
+    @pytest.mark.asyncio
+    async def test_create_activity_with_column(self) -> None:
+        """create_activity with ai_column should include it in the payload."""
+        from mcp_workboard_crunchtools.tools import create_activity
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "activity": {
+                        "ai_id": "502",
+                        "ai_description": "Prep slides",
+                        "ai_state": "doing",
+                        "ai_column": {"id": "7", "name": "Active"},
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await create_activity(
+                ai_description="Prep slides",
+                ai_workstream="100",
+                ai_state="doing",
+                ai_column="7",
+            )
+
+        assert "activity" in result
+        assert result["activity"]["column_id"] == "7"
+        assert result["activity"]["column_name"] == "Active"
 
     @pytest.mark.asyncio
     async def test_update_activity(self) -> None:
