@@ -135,6 +135,19 @@ def _format_workstream(ws: dict[str, Any]) -> dict[str, Any]:
             if count is not None:
                 formatted["action_item_count"] = count
 
+            columns: dict[str, str] = {}
+            for ai in activities:
+                if not isinstance(ai, dict):
+                    continue
+                col = ai.get("ai_column")
+                if isinstance(col, dict) and col.get("id"):
+                    columns[col["id"]] = col.get("name", "")
+            if columns:
+                formatted["columns"] = [
+                    {"column_id": cid, "column_name": cname}
+                    for cid, cname in columns.items()
+                ]
+
     return formatted
 
 
@@ -204,6 +217,50 @@ async def get_workstream_activities(
         return {"workstream": _format_workstream(ws_data)}
 
     return {"workstream": activity_body}
+
+
+async def get_workstream_columns(
+    ws_id: int,
+) -> dict[str, Any]:
+    """Get the custom Kanban columns defined on a workstream.
+
+    Fetches all action items and extracts the unique column definitions.
+    Workstreams without custom columns return an empty list.
+
+    Args:
+        ws_id: Workstream ID (positive integer).
+
+    Returns:
+        Dictionary with ws_id, name, and columns list.
+    """
+    ws_id = validate_workstream_id(ws_id)
+    client = get_client()
+
+    response = await client.get(f"/workstream/{ws_id}/activity")
+    activity_body = response.get("data", {})
+
+    ws_data = activity_body.get("workstream", {})
+    columns: dict[str, str] = {}
+
+    activity_data = ws_data.get("ws_activity", {})
+    if isinstance(activity_data, dict):
+        activities = activity_data.get("activity", [])
+        if isinstance(activities, list):
+            for ai in activities:
+                if not isinstance(ai, dict):
+                    continue
+                col = ai.get("ai_column")
+                if isinstance(col, dict) and col.get("id"):
+                    columns[col["id"]] = col.get("name", "")
+
+    return {
+        "ws_id": ws_data.get("ws_id", str(ws_id)),
+        "name": ws_data.get("ws_name", ""),
+        "columns": [
+            {"column_id": cid, "column_name": cname}
+            for cid, cname in columns.items()
+        ],
+    }
 
 
 async def get_team_workstreams(
