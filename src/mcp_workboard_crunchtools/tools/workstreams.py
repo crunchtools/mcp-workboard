@@ -95,6 +95,21 @@ def _format_activity_item(ai: dict[str, Any]) -> dict[str, Any]:
     return formatted
 
 
+def _extract_columns(activities: list[Any]) -> list[dict[str, str]]:
+    """Extract deduplicated column catalog from a list of raw action items."""
+    columns: dict[str, str] = {}
+    for ai in activities:
+        if not isinstance(ai, dict):
+            continue
+        col = ai.get("ai_column")
+        if isinstance(col, dict) and col.get("id"):
+            columns[col["id"]] = col.get("name", "")
+    return [
+        {"column_id": cid, "column_name": cname}
+        for cid, cname in columns.items()
+    ]
+
+
 def _format_workstream(ws: dict[str, Any]) -> dict[str, Any]:
     """Format a raw workstream object for MCP output."""
     formatted: dict[str, Any] = {
@@ -135,18 +150,9 @@ def _format_workstream(ws: dict[str, Any]) -> dict[str, Any]:
             if count is not None:
                 formatted["action_item_count"] = count
 
-            columns: dict[str, str] = {}
-            for ai in activities:
-                if not isinstance(ai, dict):
-                    continue
-                col = ai.get("ai_column")
-                if isinstance(col, dict) and col.get("id"):
-                    columns[col["id"]] = col.get("name", "")
-            if columns:
-                formatted["columns"] = [
-                    {"column_id": cid, "column_name": cname}
-                    for cid, cname in columns.items()
-                ]
+            extracted = _extract_columns(activities)
+            if extracted:
+                formatted["columns"] = extracted
 
     return formatted
 
@@ -239,27 +245,21 @@ async def get_workstream_columns(
     response = await client.get(f"/workstream/{ws_id}/activity")
     activity_body = response.get("data", {})
 
-    ws_data = activity_body.get("workstream", {})
-    columns: dict[str, str] = {}
+    ws_data = activity_body.get("workstream")
+    if not isinstance(ws_data, dict):
+        ws_data = {}
 
-    activity_data = ws_data.get("ws_activity", {})
+    activities: list[Any] = []
+    activity_data = ws_data.get("ws_activity")
     if isinstance(activity_data, dict):
-        activities = activity_data.get("activity", [])
-        if isinstance(activities, list):
-            for ai in activities:
-                if not isinstance(ai, dict):
-                    continue
-                col = ai.get("ai_column")
-                if isinstance(col, dict) and col.get("id"):
-                    columns[col["id"]] = col.get("name", "")
+        raw = activity_data.get("activity", [])
+        if isinstance(raw, list):
+            activities = raw
 
     return {
         "ws_id": ws_data.get("ws_id", str(ws_id)),
         "name": ws_data.get("ws_name", ""),
-        "columns": [
-            {"column_id": cid, "column_name": cname}
-            for cid, cname in columns.items()
-        ],
+        "columns": _extract_columns(activities),
     }
 
 
