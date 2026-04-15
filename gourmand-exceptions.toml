@@ -51,3 +51,10 @@ justification = "Response shape normalization handling dict vs list API response
 check = "implicit_state_machine"
 path = "src/mcp_workboard_crunchtools/client.py"
 justification = "Error handling dispatches on HTTP status codes — standard pattern, not a state machine"
+
+# Single-use helper — _extract_columns is called from two locations
+[[exceptions]]
+check = "single_use_helpers"
+path = "src/mcp_workboard_crunchtools/tools/workstreams.py"
+justification = "_extract_columns is called from two locations: _format_workstream (line 153) and get_workstream_columns (line 262). Gourmand reports one callsite, but grep confirms two distinct callers."
+classification = "gourmand_bug"
