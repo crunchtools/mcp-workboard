@@ -16,6 +16,7 @@ from .tools import (
     get_objective_details,
     get_objectives,
     get_team_members,
+    get_team_objectives,
     get_team_workstreams,
     get_teams,
     get_user,
@@ -59,7 +60,12 @@ mcp = FastMCP(
         "filters, workboard_get_activity_tool to get a single action item by ID, "
         "workboard_create_activity_tool to create a new action item, and "
         "workboard_update_activity_tool to update an existing action item's state, priority, "
-        "effort, due date, or owner."
+        "effort, due date, or owner.\n\n"
+        "TEAM OKR SNAPSHOTS: For quarterly OKR reviews or weekly snapshots that include "
+        "past-quarter objectives, use workboard_get_team_objectives_tool with a team_id "
+        "and explicit MM/DD/YYYY date bounds (e.g. startDate='01/01/2026', endDate='03/31/2026'). "
+        "This tool calls the date-range-scoped goalSummary endpoint and never silently drops "
+        "objectives whose target date has passed."
     ),
 )
 
@@ -412,6 +418,41 @@ async def workboard_get_team_workstreams_tool(
         Team info with list of workstreams
     """
     return await get_team_workstreams(team_id=team_id)
+
+
+@mcp.tool()
+async def workboard_get_team_objectives_tool(
+    team_id: int,
+    start_date: str,
+    end_date: str,
+    get_nested_teams: bool = True,
+) -> dict[str, Any]:
+    """Get all objectives for a WorkBoard team within a quarter date range.
+
+    Use this instead of workboard_get_objectives_tool when you need team-scoped
+    or cross-quarter OKR snapshots. The existing user-scoped tool silently
+    excludes objectives whose target date has passed; this tool delegates the
+    date window entirely to the WorkBoard goalSummary API so past-quarter
+    objectives (e.g. Q1 after March 31) are returned correctly.
+
+    Use workboard_get_teams_tool to discover team IDs.
+
+    Args:
+        team_id: WorkBoard team ID (positive integer).
+        start_date: Quarter start date in MM/DD/YYYY format, e.g. "04/01/2026".
+        end_date: Quarter end date in MM/DD/YYYY format, e.g. "06/30/2026".
+        get_nested_teams: Include objectives from sub-teams (default True).
+
+    Returns:
+        List of objectives with name, owner, status_color, progress, and
+        nested key_results (name, progress, last_updated, target).
+    """
+    return await get_team_objectives(
+        team_id=team_id,
+        start_date=start_date,
+        end_date=end_date,
+        get_nested_teams=get_nested_teams,
+    )
 
 
 @mcp.tool()
