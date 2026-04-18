@@ -16,7 +16,9 @@ from ..models import (
     CreateObjectiveInput,
     UpdateKeyResultInput,
     validate_metric_id,
+    validate_mm_dd_yyyy,
     validate_objective_id,
+    validate_team_id,
     validate_user_id,
 )
 
@@ -610,3 +612,62 @@ async def create_objective(
     )
 
     return {"objective": response}
+
+
+async def get_team_objectives(
+    team_id: int,
+    start_date: str,
+    end_date: str,
+    get_nested_teams: bool = True,
+) -> dict[str, Any]:
+    """Get objectives for a WorkBoard team within a date range.
+
+    Calls the ``GET /goal/goalSummary`` endpoint used by the WorkBoard web UI.
+    Unlike ``get_objectives``, which fetches by owner user ID and silently
+    excludes past-quarter objectives, this call is date-range scoped so it
+    reliably returns objectives for any quarter — including expired ones.
+
+    The date window is enforced by the API; no additional expiry filtering
+    is applied here.
+
+    If the ``goalSummary`` response does not include nested metric objects,
+    ``key_results`` will be an empty list for each objective rather than
+    raising an error.
+
+    Args:
+        team_id: WorkBoard team ID (positive integer). Use
+                 ``workboard_get_teams_tool`` to discover team IDs.
+        start_date: Quarter start date in MM/DD/YYYY format, e.g. "04/01/2026".
+        end_date: Quarter end date in MM/DD/YYYY format, e.g. "06/30/2026".
+        get_nested_teams: When True (default), includes objectives from
+                          sub-teams beneath the given team.
+
+    Returns:
+        Dictionary with ``objectives`` list. Each objective includes name,
+        owner, status_color, progress, and nested key_results.
+    """
+    team_id = validate_team_id(team_id)
+    start_date = validate_mm_dd_yyyy(start_date, "start_date")
+    end_date = validate_mm_dd_yyyy(end_date, "end_date")
+
+    client = get_client()
+
+    params: dict[str, Any] = {
+        "team_people": 1,
+        "team_s": 0,
+        "userTeamid": team_id,
+        "userTeamType": 2,
+        "getNestedTeams": "true" if get_nested_teams else "false",
+        "status": 1,
+        "performance": "4,3,2,1,0",
+        "startDate": start_date,
+        "endDate": end_date,
+        "exDate": 1,
+    }
+
+    response = await client.get("/goal/goalSummary", params=params)
+
+    body = response.get("data", {})
+    goals = _extract_goals_from_goal_response(body)
+
+    return {"objectives": [_format_goal(g) for g in goals]}
