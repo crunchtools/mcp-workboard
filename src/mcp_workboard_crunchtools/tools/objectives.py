@@ -665,7 +665,7 @@ async def get_team_objectives(
         "exDate": 1,
     }
 
-    response = await client.get("/goal/goalSummary", params=params)
+    response = await client.get("https://www.myworkboard.com/wb/goal/goalSummary", params=params)
 
     body = response.get("data", {})
     goals = _extract_goals_from_goal_response(body)
