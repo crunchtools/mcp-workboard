@@ -21,10 +21,10 @@ class TestToolRegistration:
         assert mcp is not None
 
     def test_tool_count(self) -> None:
-        """Server should have exactly 22 tools registered."""
+        """Server should have exactly 23 tools registered."""
         from mcp_workboard_crunchtools.tools import __all__
 
-        assert len(__all__) == 22
+        assert len(__all__) == 23
 
     def test_imports(self) -> None:
         """All tool functions should be importable."""
@@ -483,6 +483,110 @@ class TestObjectiveTools:
             )
 
         assert "objective" in result
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives(self) -> None:
+        """get_team_objectives should call goalSummary with required params and return objectives."""
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "goal": {
+                        "0": {
+                            "goal_id": 600,
+                            "goal_name": "Grow Revenue",
+                            "goal_progress": "50",
+                            "goal_owner_full_name": "Alice Smith",
+                            "goal_progress_color": "#339933",
+                            "goal_metrics": [
+                                {
+                                    "metric_id": 700,
+                                    "metric_name": "ARR",
+                                    "metric_target": "1000000",
+                                    "metric_achieve_target": "500000",
+                                    "metric_unit": {"name": "Currency"},
+                                },
+                            ],
+                        },
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp) as mock_client:
+            result = await get_team_objectives(
+                team_id=559244,
+                start_date="04/01/2026",
+                end_date="06/30/2026",
+            )
+
+        assert "objectives" in result
+        assert len(result["objectives"]) == 1
+        obj = result["objectives"][0]
+        assert obj["name"] == "Grow Revenue"
+        assert obj["owner"] == "Alice Smith"
+        assert obj["status_color"] == "#339933"
+        assert obj["progress"] == "50%"
+        assert len(obj["key_results"]) == 1
+        assert obj["key_results"][0]["name"] == "ARR"
+        assert "$" in obj["key_results"][0]["progress"]
+
+        # Verify the correct API path and required query params were sent
+        call_args = mock_client.return_value.request.call_args
+        assert call_args is not None
+        params = call_args.kwargs.get("params") or {}
+        assert params.get("userTeamid") == 559244
+        assert params.get("startDate") == "04/01/2026"
+        assert params.get("endDate") == "06/30/2026"
+        assert params.get("performance") == "4,3,2,1,0"
+        assert params.get("exDate") == 1
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives_no_nested_teams(self) -> None:
+        """get_team_objectives with get_nested_teams=False should pass 'false' string."""
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        resp = _mock_response(json_data={"data": {}})
+
+        with _patch_client(resp) as mock_client:
+            result = await get_team_objectives(
+                team_id=1,
+                start_date="01/01/2026",
+                end_date="03/31/2026",
+                get_nested_teams=False,
+            )
+
+        assert result["objectives"] == []
+        call_args = mock_client.return_value.request.call_args
+        params = call_args.kwargs.get("params") or {}
+        assert params.get("getNestedTeams") == "false"
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives_invalid_team_id(self) -> None:
+        """get_team_objectives should raise on invalid team_id."""
+        from mcp_workboard_crunchtools.errors import InvalidTeamIdError
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        with pytest.raises(InvalidTeamIdError):
+            await get_team_objectives(
+                team_id=0,
+                start_date="04/01/2026",
+                end_date="06/30/2026",
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives_invalid_date_format(self) -> None:
+        """get_team_objectives should raise on date in wrong format."""
+        from mcp_workboard_crunchtools.errors import ValidationError
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        with pytest.raises(ValidationError):
+            await get_team_objectives(
+                team_id=1,
+                start_date="2026-04-01",  # wrong format — should be MM/DD/YYYY
+                end_date="06/30/2026",
+            )
 
 
 class TestKeyResultTools:

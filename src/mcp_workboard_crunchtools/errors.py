@@ -58,6 +58,13 @@ class InvalidActivityIdError(UserError):
         super().__init__("Invalid activity_id format. Expected positive integer.")
 
 
+class InvalidTeamIdError(UserError):
+    """Invalid team ID format."""
+
+    def __init__(self) -> None:
+        super().__init__("Invalid team_id format. Expected positive integer.")
+
+
 SAFE_ID_MAX_LENGTH = 20
 
 

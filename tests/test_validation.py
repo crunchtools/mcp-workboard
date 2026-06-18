@@ -7,8 +7,10 @@ from mcp_workboard_crunchtools.errors import (
     InvalidActivityIdError,
     InvalidMetricIdError,
     InvalidObjectiveIdError,
+    InvalidTeamIdError,
     InvalidUserIdError,
     InvalidWorkstreamIdError,
+    ValidationError as WBValidationError,
 )
 from mcp_workboard_crunchtools.models import (
     CreateActivityInput,
@@ -19,7 +21,9 @@ from mcp_workboard_crunchtools.models import (
     UpdateWorkstreamInput,
     validate_activity_id,
     validate_metric_id,
+    validate_mm_dd_yyyy,
     validate_objective_id,
+    validate_team_id,
     validate_user_id,
     validate_workstream_id,
 )
@@ -457,3 +461,53 @@ class TestUpdateActivityInput:
                 ai_state="done",
                 ai_hidden=True,  # type: ignore[call-arg]
             )
+
+
+class TestTeamIdValidation:
+    """Tests for team_id validation."""
+
+    def test_valid_team_id(self) -> None:
+        """Valid positive integer should pass."""
+        assert validate_team_id(559244) == 559244
+
+    def test_invalid_team_id_zero(self) -> None:
+        """Zero should fail."""
+        with pytest.raises(InvalidTeamIdError):
+            validate_team_id(0)
+
+    def test_invalid_team_id_negative(self) -> None:
+        """Negative integer should fail."""
+        with pytest.raises(InvalidTeamIdError):
+            validate_team_id(-5)
+
+
+class TestMmDdYyyyValidation:
+    """Tests for MM/DD/YYYY date string validation."""
+
+    def test_valid_date(self) -> None:
+        """Valid MM/DD/YYYY string should pass and be returned unchanged."""
+        assert validate_mm_dd_yyyy("04/01/2026") == "04/01/2026"
+
+    def test_valid_year_end(self) -> None:
+        """Another valid date should pass."""
+        assert validate_mm_dd_yyyy("12/31/2025", "end_date") == "12/31/2025"
+
+    def test_iso_format_rejected(self) -> None:
+        """YYYY-MM-DD (ISO) format should fail."""
+        with pytest.raises(WBValidationError):
+            validate_mm_dd_yyyy("2026-04-01")
+
+    def test_partial_date_rejected(self) -> None:
+        """Incomplete date should fail."""
+        with pytest.raises(WBValidationError):
+            validate_mm_dd_yyyy("04/2026")
+
+    def test_non_string_rejected(self) -> None:
+        """Non-string input should fail."""
+        with pytest.raises(WBValidationError):
+            validate_mm_dd_yyyy(20260401)  # type: ignore[arg-type]
+
+    def test_empty_string_rejected(self) -> None:
+        """Empty string should fail."""
+        with pytest.raises(WBValidationError):
+            validate_mm_dd_yyyy("")

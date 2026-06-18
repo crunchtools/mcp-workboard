@@ -8,8 +8,10 @@ from .errors import (
     InvalidActivityIdError,
     InvalidMetricIdError,
     InvalidObjectiveIdError,
+    InvalidTeamIdError,
     InvalidUserIdError,
     InvalidWorkstreamIdError,
+    ValidationError,
 )
 
 MAX_NAME_LENGTH = 255
@@ -53,6 +55,23 @@ def validate_activity_id(activity_id: int) -> int:
     if not isinstance(activity_id, int) or activity_id <= 0:
         raise InvalidActivityIdError
     return activity_id
+
+
+def validate_team_id(team_id: int) -> int:
+    """Validate a team ID is a positive integer."""
+    if not isinstance(team_id, int) or team_id <= 0:
+        raise InvalidTeamIdError
+    return team_id
+
+
+_MM_DD_YYYY_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
+
+
+def validate_mm_dd_yyyy(value: str, field_name: str = "date") -> str:
+    """Validate a date string is in MM/DD/YYYY format."""
+    if not isinstance(value, str) or not _MM_DD_YYYY_RE.match(value):
+        raise ValidationError(f"Invalid {field_name} format. Expected MM/DD/YYYY (e.g. '04/01/2026').")
+    return value
 
 
 class CreateUserInput(BaseModel):
