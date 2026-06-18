@@ -24,6 +24,7 @@ from .workstreams import (
     create_workstream,
     get_team_workstreams,
     get_workstream_activities,
+    get_workstream_columns,
     get_workstreams,
     update_workstream,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "create_objective",
     "get_workstreams",
     "get_workstream_activities",
+    "get_workstream_columns",
     "get_team_workstreams",
     "create_workstream",
     "update_workstream",

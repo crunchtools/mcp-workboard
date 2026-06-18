@@ -398,6 +398,30 @@ async def workboard_get_workstream_activities_tool(
 
 
 @mcp.tool()
+async def workboard_get_workstream_columns_tool(
+    ws_id: int,
+) -> dict[str, Any]:
+    """Get the custom Kanban columns defined on a workstream.
+
+    Returns the list of custom columns (e.g. "Homework", "Interlocks",
+    "Active") configured on the workstream's Kanban board. Use the
+    column_id values with create/update activity tools to place cards
+    in specific columns.
+
+    Workstreams without custom columns return an empty list.
+
+    Args:
+        ws_id: Workstream ID (positive integer)
+
+    Returns:
+        Workstream ID, name, and list of columns with column_id and column_name
+    """
+    from .tools import get_workstream_columns
+
+    return await get_workstream_columns(ws_id=ws_id)
+
+
+@mcp.tool()
 async def workboard_get_team_workstreams_tool(
     team_id: int,
 ) -> dict[str, Any]:
