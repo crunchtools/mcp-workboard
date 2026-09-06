@@ -24,6 +24,8 @@ from mcp_workboard_crunchtools.errors import (
     TokenExpiredError,
 )
 
+FAKE_TOKEN_URL = "https://example.com/token"
+
 
 class TestTokenData:
     """Tests for the TokenData Pydantic model."""
@@ -116,7 +118,7 @@ class TestTokenStore:
         token = store.get_access_token(
             client_id="cid",
             client_secret=SecretStr("csecret"),
-            token_url="https://example.com/token",  # noqa: S106
+            token_url=FAKE_TOKEN_URL,
         )
         assert token == "valid-token"
 
@@ -126,7 +128,7 @@ class TestTokenStore:
             store.get_access_token(
                 client_id="cid",
                 client_secret=SecretStr("csecret"),
-                token_url="https://example.com/token",  # noqa: S106
+                token_url=FAKE_TOKEN_URL,
             )
 
     def test_get_access_token_expired_no_refresh(self, tmp_path: Path) -> None:
@@ -140,7 +142,7 @@ class TestTokenStore:
             store.get_access_token(
                 client_id="cid",
                 client_secret=SecretStr("csecret"),
-                token_url="https://example.com/token",  # noqa: S106
+                token_url=FAKE_TOKEN_URL,
             )
 
     def test_get_access_token_refreshes(self, tmp_path: Path) -> None:
@@ -170,7 +172,7 @@ class TestTokenStore:
             token = store.get_access_token(
                 client_id="cid",
                 client_secret=SecretStr("csecret"),
-                token_url="https://example.com/token",  # noqa: S106
+                token_url=FAKE_TOKEN_URL,
             )
 
         assert token == "new-token"
