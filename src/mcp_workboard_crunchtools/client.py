@@ -40,10 +40,7 @@ class WorkBoardClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 base_url=self._config.api_base_url,
-                headers={
-                    "Authorization": f"Bearer {self._config.token}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
                 timeout=httpx.Timeout(REQUEST_TIMEOUT),
                 verify=True,
             )
@@ -79,6 +76,7 @@ class WorkBoardClient:
             PermissionDeniedError: On authorization failures
         """
         client = await self._get_client()
+        auth_headers = {"Authorization": f"Bearer {self._config.token}"}
 
         logger.debug("API request: %s %s", method, path)
 
@@ -88,6 +86,7 @@ class WorkBoardClient:
                 url=path,
                 params=params,
                 json=json_data,
+                headers=auth_headers,
             )
         except httpx.TimeoutException as e:
             raise WorkBoardApiError(0, f"Request timeout: {e}") from e

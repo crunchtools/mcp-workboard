@@ -97,12 +97,27 @@ class WorkBoardApiError(UserError):
     """
 
     def __init__(self, code: int, message: str) -> None:
-        token = os.environ.get("WORKBOARD_API_TOKEN", "")
-        safe_message = message.replace(token, "***") if token else message
+        safe_message = message
+        for var in ("WORKBOARD_API_TOKEN", "WORKBOARD_CLIENT_SECRET"):
+            secret = os.environ.get(var, "")
+            if secret:
+                safe_message = safe_message.replace(secret, "***")
         super().__init__(f"WorkBoard API error {code}: {safe_message}")
 
 
 class ValidationError(UserError):
     """Input validation error."""
+
+    pass
+
+
+class AuthenticationError(UserError):
+    """OAuth authentication flow failed."""
+
+    pass
+
+
+class TokenExpiredError(UserError):
+    """OAuth tokens expired and refresh failed."""
 
     pass
