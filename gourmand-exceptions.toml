@@ -51,3 +51,50 @@ justification = "Response shape normalization handling dict vs list API response
 check = "implicit_state_machine"
 path = "src/mcp_workboard_crunchtools/client.py"
 justification = "Error handling dispatches on HTTP status codes — standard pattern, not a state machine"
+
+# --- Surfaced by restoring the [thresholds] block in gourmand.toml. ---
+
+[[exceptions]]
+check = "lint_suppression"
+path = "src/mcp_workboard_crunchtools/auth.py"
+justification = "`# type: ignore[assignment]` narrowing self.server to _CallbackServer. BaseHTTPRequestHandler types self.server as BaseServer; the handler genuinely runs under our subclass and needs its fields. Narrowing a base-class attribute is what this suppression is for."
+
+[[exceptions]]
+check = "generic_names"
+path = "src/mcp_workboard_crunchtools/auth.py"
+justification = "`data` is the parameter of TokenStore.save(data: TokenData) — named for the type it takes, in a two-line method that serialises it."
+
+[[exceptions]]
+check = "primitive_obsession"
+path = "src/mcp_workboard_crunchtools/auth.py"
+justification = "HTTP 200 in the OAuth callback handler. A standard well-known status code."
+
+[[exceptions]]
+check = "over_abstraction"
+path = "tests/conftest.py"
+justification = "_mock_response builds the httpx.Response every test asserts against. Inlining it repeats the construction across the suite."
+
+[[exceptions]]
+check = "copy_paste_detection"
+path = "src/mcp_workboard_crunchtools/client.py"
+justification = "get_client and get_config are both the four-line lazy-singleton accessor. The duplication is the idiom; hiding it behind a generic obscures which global is being initialised."
+
+[[exceptions]]
+check = "copy_paste_detection"
+path = "src/mcp_workboard_crunchtools/models.py"
+justification = "Two clusters of small Pydantic validators — five ID validators and six field validators — each matching a different value against a different rule and raising a message naming the field that was wrong. The per-field message is what makes a bad tool call diagnosable; they share only the check-then-raise shape."
+
+[[exceptions]]
+check = "copy_paste_detection"
+path = "src/mcp_workboard_crunchtools/tools/activities.py"
+justification = "The fifteen identical statements _format_activity shared with workstreams._format_activity_item have been extracted into tools/formatting.py. What remains matching is four lines of dict-literal shape over different field sets — activities returns note, workstream and team, a workstream listing does not."
+
+[[exceptions]]
+check = "copy_paste_detection"
+path = "src/mcp_workboard_crunchtools/tools/formatting.py"
+justification = "add_action_item_details is matched against objectives._format_goal. They handle different WorkBoard objects — an action item and a goal — and share only the guard-then-project shape used for every optional nested collection the API returns."
+
+[[exceptions]]
+check = "single_use_helpers"
+path = "src/mcp_workboard_crunchtools/config.py"
+justification = "_load_static_token is the static-token branch of a three-mode auth resolution (static token, OAuth client, stored token). Inlining it into __init__ interleaves the env-and-file lookup with the branch that selects the mode."
