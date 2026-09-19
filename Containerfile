@@ -1,5 +1,5 @@
 # MCP WorkBoard CrunchTools Container
-# Multi-stage build: compile in python:3.14-slim, run in Hummingbird (distroless).
+# Multi-stage build: compile in the Hummingbird builder, run in Hummingbird (distroless).
 #
 # Build:
 #   podman build -t quay.io/crunchtools/mcp-workboard .
@@ -13,15 +13,18 @@
 #     -- podman run -i --rm -e WORKBOARD_API_TOKEN quay.io/crunchtools/mcp-workboard
 
 # --- Build stage (has /bin/sh, pip, etc.) ---
-FROM python:3.14-slim AS builder
 
-WORKDIR /build
+# Stage 1: Builder (has a shell, dnf and build tools)
+FROM quay.io/hummingbird/python:latest-builder AS builder
+USER 0
+WORKDIR /app
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir . \
-    && python -c "from mcp_workboard_crunchtools import main; print('Installation verified')"
+RUN pip install --no-cache-dir .
 
-# --- Runtime stage (Hummingbird distroless — no shell on amd64) ---
+# Stage 2: Runtime (distroless -- no shell, no package manager)
 FROM quay.io/hummingbird/python:latest
 
 LABEL name="mcp-workboard-crunchtools" \
@@ -38,7 +41,11 @@ LABEL name="mcp-workboard-crunchtools" \
 
 WORKDIR /app
 
-COPY --from=builder /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
+COPY --from=builder /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Verify the install. Exec form: this stage has no /bin/sh for RUN's shell form.
+RUN ["python3", "-c", "from mcp_workboard_crunchtools import main; print('Installation verified')"]
 
 # Default: stdio transport (use -i with podman run)
 # HTTP:    --transport streamable-http (use -d -p 8000:8000 with podman run)
