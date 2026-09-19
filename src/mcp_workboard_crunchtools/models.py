@@ -146,10 +146,13 @@ class CreateObjectiveInput(BaseModel):
         default=None, max_length=MAX_NARRATIVE_LENGTH, description="Objective description"
     )
     goal_type: str = Field(default="1", description="1=Team, 2=Personal")
+    team_id: str | None = Field(
+        default=None, description="Team ID (required for Team objectives, goal_type=1)"
+    )
     permission: str = Field(
-        default="internal,team",
+        default="owner,manager",
         max_length=MAX_PERMISSION_LENGTH,
-        description="Visibility setting",
+        description='Visibility setting (API accepts "owner", "manager", or "owner,manager")',
     )
 
     @field_validator("start_date", "target_date")

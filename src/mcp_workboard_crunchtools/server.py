@@ -4,7 +4,12 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, Response
 
+from .auth import exchange_code_for_tokens, generate_auth_url
+from .config import AuthMode, get_config
+from .errors import AuthenticationError, ConfigurationError
 from .tools import (
     create_activity,
     create_objective,
@@ -62,6 +67,103 @@ mcp = FastMCP(
         "effort, due date, or owner."
     ),
 )
+
+_pending_auth: dict[str, str] = {}
+
+
+def _build_login_url() -> str | None:
+    """Generate an OAuth login URL if in OAuth mode, or None."""
+    try:
+        config = get_config()
+    except ConfigurationError:
+        return None
+    if config.auth_mode != AuthMode.OAUTH or not config.client_id:
+        return None
+    auth_url, state = generate_auth_url(config.client_id, config.oauth_redirect_uri)
+    _pending_auth[state] = config.oauth_redirect_uri
+    return auth_url
+
+
+@mcp.custom_route("/callback", methods=["GET"])
+async def oauth_callback(request: Request) -> Response:
+    """Handle the OAuth callback from WorkBoard."""
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+    error = request.query_params.get("error")
+
+    if error:
+        return HTMLResponse(
+            f"<html><body><h2>Login failed</h2><p>{error}</p></body></html>",
+            status_code=400,
+        )
+
+    if not code or not state:
+        return HTMLResponse(
+            "<html><body><h2>Missing code or state parameter</h2></body></html>",
+            status_code=400,
+        )
+
+    if state not in _pending_auth:
+        return HTMLResponse(
+            "<html><body><h2>Invalid or expired state parameter</h2>"
+            "<p>Try calling workboard_login_tool again.</p></body></html>",
+            status_code=400,
+        )
+
+    redirect_uri = _pending_auth.pop(state)
+
+    try:
+        config = get_config()
+        assert config.client_id is not None
+        assert config.client_secret is not None
+        assert config.token_store is not None
+        exchange_code_for_tokens(
+            code=code,
+            client_id=config.client_id,
+            client_secret=config.client_secret,
+            redirect_uri=redirect_uri,
+            state=state,
+            token_store=config.token_store,
+        )
+    except (AuthenticationError, ConfigurationError) as e:
+        return HTMLResponse(
+            f"<html><body><h2>Login failed</h2><p>{e}</p></body></html>",
+            status_code=500,
+        )
+
+    return HTMLResponse(
+        "<html><body>"
+        "<h2>WorkBoard login successful!</h2>"
+        "<p>You can close this tab. Your MCP tools are now authenticated.</p>"
+        "</body></html>"
+    )
+
+
+@mcp.tool()
+async def workboard_login_tool() -> dict[str, str]:
+    """Authenticate with WorkBoard via OAuth 2.
+
+    Generates an authorization URL that you must open in a browser.
+    After logging in, WorkBoard redirects back and tokens are saved
+    automatically. Re-run any failed tool after login completes.
+
+    Returns:
+        Dictionary with auth_url to open in a browser
+    """
+    auth_url = _build_login_url()
+    if auth_url is None:
+        return {
+            "error": "OAuth is not configured. Set WORKBOARD_CLIENT_ID and WORKBOARD_CLIENT_SECRET."
+        }
+    return {
+        "status": "login_required",
+        "auth_url": auth_url,
+        "instructions": (
+            "Open the auth_url in a browser to log in to WorkBoard. "
+            "After login, tokens are saved automatically. "
+            "Then retry your original request."
+        ),
+    }
 
 
 @mcp.tool()
@@ -326,7 +428,8 @@ async def workboard_create_objective_tool(
     target_date: str,
     narrative: str | None = None,
     goal_type: str = "1",
-    permission: str = "internal,team",
+    team_id: str | None = None,
+    permission: str = "owner,manager",
     key_results: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results (requires Data-Admin token).
@@ -342,7 +445,9 @@ async def workboard_create_objective_tool(
         target_date: Target completion date in YYYY-MM-DD format
         narrative: Optional description/narrative for the objective
         goal_type: "1" for Team objective (default), "2" for Personal objective
-        permission: Visibility setting (default "internal,team")
+        team_id: Team ID (required for Team objectives, goal_type="1").
+                 Get from workboard_get_teams_tool.
+        permission: Visibility setting (default "owner,manager")
         key_results: Optional list of key result dicts, each with keys like
                      "metric_name", "metric_start", "metric_target", "metric_type"
 
@@ -356,6 +461,7 @@ async def workboard_create_objective_tool(
         target_date=target_date,
         narrative=narrative,
         goal_type=goal_type,
+        team_id=team_id,
         permission=permission,
         key_results=key_results,
     )

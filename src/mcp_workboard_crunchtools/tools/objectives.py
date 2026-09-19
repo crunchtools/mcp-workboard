@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..client import get_client
-from ..errors import UserError
+from ..errors import UserError, WorkBoardApiError
 from ..models import (
     CreateObjectiveInput,
     UpdateKeyResultInput,
@@ -553,7 +553,8 @@ async def create_objective(
     target_date: str,
     narrative: str | None = None,
     goal_type: str = "1",
-    permission: str = "internal,team",
+    team_id: str | None = None,
+    permission: str = "owner,manager",
     key_results: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results (requires Data-Admin token).
@@ -565,7 +566,8 @@ async def create_objective(
         target_date: Target completion date (YYYY-MM-DD format)
         narrative: Optional description/narrative for the objective
         goal_type: "1" for Team objective, "2" for Personal objective
-        permission: Visibility setting (default "internal,team")
+        team_id: Team ID (required for Team objectives, goal_type="1")
+        permission: Visibility setting (default "owner,manager")
         key_results: Optional list of key result dicts, each with keys like
                      "metric_name", "metric_start", "metric_target", "metric_type"
 
@@ -579,6 +581,7 @@ async def create_objective(
         target_date=target_date,
         narrative=narrative,
         goal_type=goal_type,
+        team_id=team_id,
         permission=permission,
     )
 
@@ -591,6 +594,9 @@ async def create_objective(
         "goal_permission": validated.permission,
     }
 
+    if validated.team_id is not None:
+        goal["goal_team_id"] = validated.team_id
+
     if validated.narrative is not None:
         goal["goal_narrative"] = validated.narrative
 
@@ -600,6 +606,17 @@ async def create_objective(
     client = get_client()
 
     response = await client.post("/goal", json_data={"goals": [goal]})
+
+    goal_data = response.get("data", {}).get("goal", {})
+    errors = goal_data.get("error", [])
+    if errors and not goal_data.get("goals"):
+        error_msgs = []
+        for err in errors:
+            if isinstance(err, dict):
+                error_msgs.extend(err.get("error", []))
+            elif isinstance(err, str):
+                error_msgs.append(err)
+        raise WorkBoardApiError(200, "; ".join(error_msgs) or "Validation failed")
 
     logger.info(
         "AUDIT: Objective created — name=%r, owner=%s, dates=%s to %s",

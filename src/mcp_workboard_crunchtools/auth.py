@@ -107,7 +107,7 @@ class TokenStore:
             self._cached = self.load()
         if self._cached is None:
             raise TokenExpiredError(
-                "No OAuth tokens found. Run `mcp-workboard-crunchtools login` first."
+                "No OAuth tokens found. Call workboard_login_tool to authenticate."
             )
 
         if time.time() < self._cached.expires_at - REFRESH_MARGIN_SECONDS:
@@ -116,7 +116,7 @@ class TokenStore:
         if self._cached.refresh_token is None:
             raise TokenExpiredError(
                 "Access token expired and no refresh token available. "
-                "Run `mcp-workboard-crunchtools login` again."
+                "Call workboard_login_tool to re-authenticate."
             )
 
         logger.info("Access token expired, refreshing...")
@@ -135,7 +135,7 @@ class TokenStore:
                 token_response = response.json()
         except (httpx.HTTPError, ValueError) as e:
             raise TokenExpiredError(
-                f"Token refresh failed: {e}. Run `mcp-workboard-crunchtools login` again."
+                f"Token refresh failed: {e}. Call workboard_login_tool to re-authenticate."
             ) from e
 
         new_data = _parse_token_response(token_response, self._cached.refresh_token)
@@ -159,6 +159,65 @@ def _parse_token_response(
         refresh_token=(SecretStr(refresh_token) if refresh_token else fallback_refresh_token),
         expires_at=time.time() + expires_in,
     )
+
+
+def generate_auth_url(
+    client_id: str,
+    redirect_uri: str,
+) -> tuple[str, str]:
+    """Build the WorkBoard OAuth authorization URL.
+
+    Returns:
+        (auth_url, state) — the URL to open in a browser and the state
+        parameter to verify on callback.
+    """
+    state = secrets.token_urlsafe(32)
+    params = urlencode(
+        {
+            "client_id": client_id,
+            "response_type": "code",
+            "redirect_uri": redirect_uri,
+            "scope": "all",
+            "state": state,
+        }
+    )
+    return f"{OAUTH_AUTHORIZE_URL}?{params}", state
+
+
+def exchange_code_for_tokens(
+    code: str,
+    client_id: str,
+    client_secret: SecretStr,
+    redirect_uri: str,
+    state: str,
+    token_store: TokenStore,
+) -> TokenData:
+    """Exchange an authorization code for tokens and save them."""
+    try:
+        with httpx.Client(timeout=30.0, verify=True) as http:
+            response = http.post(
+                OAUTH_TOKEN_URL,
+                data={
+                    "client_id": client_id,
+                    "client_hash": client_secret.get_secret_value(),
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                    "state": state,
+                },
+            )
+            response.raise_for_status()
+            token_response = response.json()
+    except httpx.HTTPStatusError as e:
+        raise AuthenticationError(
+            f"Token exchange failed (HTTP {e.response.status_code}): {e.response.text}"
+        ) from e
+    except (httpx.HTTPError, ValueError) as e:
+        raise AuthenticationError(f"Token exchange failed: {e}") from e
+
+    token_data = _parse_token_response(token_response)
+    token_store.save(token_data)
+    logger.info("Tokens saved to %s", token_store.path)
+    return token_data
 
 
 def _generate_pkce() -> tuple[str, str]:
@@ -213,21 +272,9 @@ def run_login_flow(
     token_store: TokenStore,
     callback_port: int = DEFAULT_CALLBACK_PORT,
 ) -> None:
-    """Execute the full OAuth 2 authorization code flow."""
+    """Execute the full OAuth 2 authorization code flow (CLI mode)."""
     redirect_uri = f"http://localhost:{callback_port}/callback"
-
-    state = secrets.token_urlsafe(32)
-
-    params = urlencode(
-        {
-            "client_id": client_id,
-            "response_type": "code",
-            "redirect_uri": redirect_uri,
-            "scope": "all",
-            "state": state,
-        }
-    )
-    auth_url = f"{OAUTH_AUTHORIZE_URL}?{params}"
+    auth_url, state = generate_auth_url(client_id, redirect_uri)
 
     server = _CallbackServer(("127.0.0.1", callback_port), _CallbackHandler)
 
@@ -248,27 +295,12 @@ def run_login_flow(
         raise AuthenticationError("State parameter mismatch — possible CSRF attack")
 
     print("Exchanging authorization code for tokens...")
-    try:
-        with httpx.Client(timeout=30.0, verify=True) as http:
-            response = http.post(
-                OAUTH_TOKEN_URL,
-                data={
-                    "client_id": client_id,
-                    "client_hash": client_secret.get_secret_value(),
-                    "code": server.callback_code,
-                    "redirect_uri": redirect_uri,
-                    "state": state,
-                },
-            )
-            response.raise_for_status()
-            token_response = response.json()
-    except httpx.HTTPStatusError as e:
-        raise AuthenticationError(
-            f"Token exchange failed (HTTP {e.response.status_code}): {e.response.text}"
-        ) from e
-    except (httpx.HTTPError, ValueError) as e:
-        raise AuthenticationError(f"Token exchange failed: {e}") from e
-
-    token_data = _parse_token_response(token_response)
-    token_store.save(token_data)
+    exchange_code_for_tokens(
+        code=server.callback_code,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        state=state,
+        token_store=token_store,
+    )
     print(f"Login successful! Tokens saved to {token_store.path}")

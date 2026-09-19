@@ -106,6 +106,25 @@ class Config:
         )
 
     @property
+    def client_id(self) -> str | None:
+        return self._client_id
+
+    @property
+    def client_secret(self) -> SecretStr | None:
+        return self._client_secret
+
+    @property
+    def token_store(self) -> TokenStore | None:
+        return self._token_store
+
+    @property
+    def oauth_redirect_uri(self) -> str:
+        return os.environ.get(
+            "WORKBOARD_OAUTH_REDIRECT_URI",
+            "http://localhost:8007/oauth/callback",
+        )
+
+    @property
     def api_base_url(self) -> str:
         """Hardcoded WorkBoard API base URL.
 
