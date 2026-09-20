@@ -3,6 +3,7 @@
 These tests verify tool behavior without making actual API calls.
 """
 
+import os
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -41,8 +42,6 @@ class TestErrorSafety:
 
     def test_workboard_api_error_sanitizes_token(self) -> None:
         """WorkBoardApiError should sanitize tokens from messages."""
-        import os
-
         from mcp_workboard_crunchtools.errors import WorkBoardApiError
 
         os.environ["WORKBOARD_API_TOKEN"] = "secret_token_12345"
@@ -100,8 +99,6 @@ class TestConfigSafety:
 
     def test_config_repr_hides_token(self) -> None:
         """Config repr should never show the token."""
-        import os
-
         os.environ["WORKBOARD_API_TOKEN"] = "secret_test_token"
 
         try:
@@ -116,8 +113,6 @@ class TestConfigSafety:
 
     def test_config_requires_token(self) -> None:
         """Config should require WORKBOARD_API_TOKEN."""
-        import os
-
         from mcp_workboard_crunchtools.config import Config
         from mcp_workboard_crunchtools.errors import ConfigurationError
 
@@ -139,8 +134,6 @@ class TestConfigSafety:
 
     def test_config_loads_token_from_file(self, tmp_path) -> None:
         """Config should load token from WORKBOARD_API_TOKEN_FILE."""
-        import os
-
         from mcp_workboard_crunchtools.config import Config
 
         token_file = tmp_path / "token"
@@ -163,8 +156,6 @@ class TestConfigSafety:
 
     def test_config_file_not_found(self) -> None:
         """Config should raise ConfigurationError for missing token file."""
-        import os
-
         from mcp_workboard_crunchtools.config import Config
         from mcp_workboard_crunchtools.errors import ConfigurationError
 
@@ -434,8 +425,6 @@ class TestObjectiveTools:
             }
         )
 
-        import os
-
         import mcp_workboard_crunchtools.client as client_mod
         import mcp_workboard_crunchtools.config as config_mod
 
@@ -569,8 +558,6 @@ class TestKeyResultTools:
                 "data": {"metric": {"metric_id": 10, "metric_achieve_target": "75"}},
             }
         )
-
-        import os
 
         import mcp_workboard_crunchtools.client as client_mod
         import mcp_workboard_crunchtools.config as config_mod
@@ -851,8 +838,6 @@ class TestWorkstreamTools:
             }
         )
 
-        import os
-
         import mcp_workboard_crunchtools.client as client_mod
         import mcp_workboard_crunchtools.config as config_mod
 
@@ -1041,8 +1026,6 @@ class TestActivityTools:
                 },
             }
         )
-
-        import os
 
         import mcp_workboard_crunchtools.client as client_mod
         import mcp_workboard_crunchtools.config as config_mod

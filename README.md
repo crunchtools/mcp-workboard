@@ -6,7 +6,7 @@ A secure MCP (Model Context Protocol) server for WorkBoard OKR and strategy exec
 
 This MCP server is designed to be:
 
-- **Secure by default** - Comprehensive threat modeling, input validation, and token protection
+- **Secure by default** - Threat modeling, input validation, and token protection
 - **No third-party services** - Runs locally via stdio, your API token never leaves your machine
 - **Cross-platform** - Works on Linux, macOS, and Windows
 - **Automatically updated** - GitHub Actions monitor for CVEs and update dependencies

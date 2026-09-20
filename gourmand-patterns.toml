@@ -1,0 +1,6 @@
+# Project-specific pattern overrides for gourmand checks.
+
+[CH020-direct_exit]
+# console_scripts in pyproject.toml points at mcp_workboard_crunchtools:main,
+# i.e. __init__.py -- this package's actual entry point, not a main.py/cli.py.
+entry_point_files = ["**/main.rs", "**/main.py", "**/cli.rs", "**/cli.py", "**/_main.py", "**/_cli.py", "bin/**", "**/__init__.py"]

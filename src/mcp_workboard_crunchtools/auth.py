@@ -71,15 +71,17 @@ class TokenStore:
         else:
             return self._cached
 
-    def save(self, data: TokenData) -> None:
+    def save(self, token_data: TokenData) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(
             {
-                "access_token": data.access_token.get_secret_value(),
+                "access_token": token_data.access_token.get_secret_value(),
                 "refresh_token": (
-                    data.refresh_token.get_secret_value() if data.refresh_token else None
+                    token_data.refresh_token.get_secret_value()
+                    if token_data.refresh_token
+                    else None
                 ),
-                "expires_at": data.expires_at,
+                "expires_at": token_data.expires_at,
             },
             indent=2,
         )
@@ -94,7 +96,7 @@ class TokenStore:
         except Exception:
             os.close(fd)
             raise
-        self._cached = data
+        self._cached = token_data
         logger.info("Tokens saved to %s", self._path)
 
     def get_access_token(
