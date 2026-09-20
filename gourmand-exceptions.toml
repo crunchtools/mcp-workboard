@@ -1,12 +1,3 @@
-# Gourmand Exceptions
-# Documented exceptions for files that legitimately trigger checks
-
-# Summary litter — CLAUDE.md is a standard Claude Code project instructions file
-[[exceptions]]
-check = "summary_litter"
-path = "CLAUDE.md"
-justification = "Claude Code project instructions for AI assistant orientation"
-classification = "by_design"
 
 # Lint suppression — test intentionally passes invalid args to verify rejection
 [[exceptions]]
@@ -36,43 +27,12 @@ path = "src/mcp_workboard_crunchtools/__init__.py"
 justification = "Port 8000 is a standard default for HTTP servers"
 classification = "by_design"
 
-# Implicit state machine — optional parameter builders are not state machines
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_workboard_crunchtools/tools/users.py"
-justification = "Optional API parameter builders use simple if-guards to add body fields, not state machines"
-classification = "by_design"
-
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_workboard_crunchtools/tools/objectives.py"
-justification = "Optional API parameter builders and response format normalization, not state machines"
-classification = "by_design"
-
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_workboard_crunchtools/tools/teams.py"
-justification = "Response shape normalization handling dict vs list API responses, not state machines"
-classification = "by_design"
-
-[[exceptions]]
-check = "implicit_state_machine"
-path = "src/mcp_workboard_crunchtools/client.py"
-justification = "Error handling dispatches on HTTP status codes — standard pattern, not a state machine"
-classification = "by_design"
-
 # --- Surfaced by restoring the [thresholds] block in gourmand.toml. ---
 
 [[exceptions]]
 check = "lint_suppression"
 path = "src/mcp_workboard_crunchtools/auth.py"
 justification = "`# type: ignore[assignment]` narrowing self.server to _CallbackServer. BaseHTTPRequestHandler types self.server as BaseServer; the handler genuinely runs under our subclass and needs its fields. Narrowing a base-class attribute is what this suppression is for."
-classification = "by_design"
-
-[[exceptions]]
-check = "primitive_obsession"
-path = "src/mcp_workboard_crunchtools/auth.py"
-justification = "HTTP 200 in the OAuth callback handler. A standard well-known status code."
 classification = "by_design"
 
 [[exceptions]]
@@ -103,12 +63,6 @@ classification = "by_design"
 check = "copy_paste_detection"
 path = "src/mcp_workboard_crunchtools/tools/formatting.py"
 justification = "add_action_item_details is matched against objectives._format_goal. They handle different WorkBoard objects — an action item and a goal — and share only the guard-then-project shape used for every optional nested collection the API returns."
-classification = "by_design"
-
-[[exceptions]]
-check = "single_use_helpers"
-path = "src/mcp_workboard_crunchtools/config.py"
-justification = "_load_static_token is the static-token branch of a three-mode auth resolution (static token, OAuth client, stored token). Inlining it into __init__ interleaves the env-and-file lookup with the branch that selects the mode."
 classification = "by_design"
 
 [[exceptions]]
