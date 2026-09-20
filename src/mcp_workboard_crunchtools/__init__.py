@@ -10,8 +10,8 @@ __version__ = "0.8.0"
 __all__ = ["main", "mcp"]
 
 
-def _run_login(args: argparse.Namespace) -> None:
-    """Handle the login subcommand."""
+def _run_login(args: argparse.Namespace) -> int:
+    """Handle the login subcommand. Returns the process exit code."""
     from pydantic import SecretStr
 
     from .auth import TokenStore, run_login_flow
@@ -25,7 +25,7 @@ def _run_login(args: argparse.Namespace) -> None:
             "Error: WORKBOARD_CLIENT_ID and WORKBOARD_CLIENT_SECRET must be set for OAuth login.",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
 
     token_store = TokenStore()
     try:
@@ -37,7 +37,8 @@ def _run_login(args: argparse.Namespace) -> None:
         )
     except AuthenticationError as e:
         print(f"Login failed: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
 
 
 def _run_server(args: argparse.Namespace) -> None:
@@ -89,6 +90,6 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "login":
-        _run_login(args)
+        sys.exit(_run_login(args))
     else:
         _run_server(args)

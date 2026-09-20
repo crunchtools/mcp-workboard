@@ -94,9 +94,10 @@ class Config:
         if self._auth_mode == AuthMode.STATIC_TOKEN:
             return self._static_token.get_secret_value()
 
-        assert self._token_store is not None
-        assert self._client_id is not None
-        assert self._client_secret is not None
+        if self._token_store is None or self._client_id is None or self._client_secret is None:
+            raise ConfigurationError(
+                "OAuth mode is not fully configured (internal invariant violated)"
+            )
         from .auth import OAUTH_TOKEN_URL
 
         return self._token_store.get_access_token(
