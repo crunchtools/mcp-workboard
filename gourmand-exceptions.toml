@@ -165,5 +165,5 @@ classification = "by_design"
 [[exceptions]]
 check = "manifest_lint_suppression"
 path = "pyproject.toml"
-justification = "All ignore entries are project-wide style choices (not quality/correctness lints), each with an inline comment explaining the reason; see pyproject.toml comments"
-classification = "by_design"
+justification = "The project-wide ruff ignore list has had no line-by-line review. The claim previously recorded here -- that these are all style choices rather than quality or correctness lints -- is false: S105 is a flake8-bandit SECURITY rule, and PLR2004, PLC0415 and PLW0603 are correctness and structural rules. Several inline comments also describe a single file or test-only situation while the ignore is applied project-wide. Classified as accepted debt, not design, so it keeps counting against this repo's score until a fleet-wide ruff policy is decided (RT #1482)."
+classification = "accepted_bad_taste"
