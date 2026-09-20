@@ -41,7 +41,7 @@ Two auth modes, chosen by which environment variables are set:
 
 To get OAuth credentials: go to WorkBoard Admin > Custom Integrations > App tab, register an app with redirect URI `http://localhost:8963/callback`.
 
-### Lotor / Remote Deployment
+### Remote Deployment
 
 For remote deployments where the MCP server runs in a container:
 1. Run `mcp-workboard-crunchtools login` on your local machine
