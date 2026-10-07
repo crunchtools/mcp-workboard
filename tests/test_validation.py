@@ -527,6 +527,11 @@ class TestKeyResultInput:
         with pytest.raises(ValidationError):
             KeyResultInput(name="")
 
+    def test_overlong_value_rejected(self) -> None:
+        """Numeric value strings are length-bounded (constitution)."""
+        with pytest.raises(ValidationError):
+            KeyResultInput(name="Ship it", target_value="9" * 100)
+
     def test_extra_fields_rejected(self) -> None:
         """Extra fields should be rejected."""
         with pytest.raises(ValidationError):

@@ -142,10 +142,16 @@ class KeyResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH, description="Key result name")
-    start_value: str | None = Field(default=None, description="Starting value (e.g. '0')")
-    target_value: str | None = Field(default=None, description="Target value (e.g. '100')")
+    start_value: str | None = Field(
+        default=None, max_length=MAX_VALUE_LENGTH, description="Starting value (e.g. '0')"
+    )
+    target_value: str | None = Field(
+        default=None, max_length=MAX_VALUE_LENGTH, description="Target value (e.g. '100')"
+    )
     unit_type: str | None = Field(
-        default=None, description="Unit type (e.g. 'Number', 'Currency', 'Percent')"
+        default=None,
+        max_length=MAX_NAME_LENGTH,
+        description="Unit type (e.g. 'Number', 'Currency', 'Percent')",
     )
 
     @field_validator("start_value", "target_value", "unit_type")
