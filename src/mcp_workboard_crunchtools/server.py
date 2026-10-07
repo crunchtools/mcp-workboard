@@ -5,6 +5,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from .models import KeyResultInput
 from .tools import (
     create_activity,
     create_objective,
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.8.0",
+    version="0.9.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -325,15 +326,19 @@ async def workboard_create_objective_tool(
     start_date: str,
     target_date: str,
     narrative: str | None = None,
-    goal_type: str = "1",
-    permission: str = "internal,team",
-    key_results: list[dict[str, str]] | None = None,
+    objective_type: str = "team",
+    permission: str = "manager",
+    key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
-    """Create a new objective with optional key results (requires Data-Admin token).
+    """Create a new objective with optional key results.
 
-    Provide the goal name, owner, dates, and optionally key results with targets.
-    Each key result dict can include: metric_name, metric_start, metric_target,
-    metric_type.
+    Creates Team or Individual objectives. Requires an OAuth token whose account
+    has the Data-Admin role; instant JWT tokens cannot create objectives. The API
+    has no update or delete for objectives — those are UI-only.
+
+    Provide the objective name, owner, dates, and optionally key results with
+    targets. Each key result has a name and optional start_value, target_value,
+    and unit_type (e.g. "Number", "Currency", "Percent").
 
     Args:
         name: Objective name (e.g. "Increase customer retention")
@@ -341,10 +346,10 @@ async def workboard_create_objective_tool(
         start_date: Start date in YYYY-MM-DD format
         target_date: Target completion date in YYYY-MM-DD format
         narrative: Optional description/narrative for the objective
-        goal_type: "1" for Team objective (default), "2" for Personal objective
-        permission: Visibility setting (default "internal,team")
-        key_results: Optional list of key result dicts, each with keys like
-                     "metric_name", "metric_start", "metric_target", "metric_type"
+        objective_type: "team" (default) or "individual"
+        permission: Visibility setting (e.g. "owner", "manager", "internal")
+        key_results: Optional list of key results, each with a name and optional
+                     start_value, target_value, and unit_type
 
     Returns:
         Created objective details
@@ -355,7 +360,7 @@ async def workboard_create_objective_tool(
         start_date=start_date,
         target_date=target_date,
         narrative=narrative,
-        goal_type=goal_type,
+        objective_type=objective_type,
         permission=permission,
         key_results=key_results,
     )

@@ -126,6 +126,43 @@ class UpdateKeyResultInput(BaseModel):
         return v
 
 
+# WorkBoard UI vocabulary → API goal_type encoding. The API field is an opaque
+# integer; agents speak in the UI's terms ("team"/"individual"). Numeric strings
+# are accepted too for back-compat.
+_OBJECTIVE_TYPE_MAP = {"team": "1", "1": "1", "individual": "2", "2": "2"}
+
+
+class KeyResultInput(BaseModel):
+    """A key result to attach to a new objective.
+
+    Field names use OKR vocabulary; they are mapped to the WorkBoard API's
+    ``metric_*`` fields when the objective is created.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH, description="Key result name")
+    start_value: str | None = Field(
+        default=None, max_length=MAX_VALUE_LENGTH, description="Starting value (e.g. '0')"
+    )
+    target_value: str | None = Field(
+        default=None, max_length=MAX_VALUE_LENGTH, description="Target value (e.g. '100')"
+    )
+    unit_type: str | None = Field(
+        default=None,
+        max_length=MAX_NAME_LENGTH,
+        description="Unit type (e.g. 'Number', 'Currency', 'Percent')",
+    )
+
+    @field_validator("start_value", "target_value", "unit_type")
+    @classmethod
+    def blank_is_unset(cls, v: str | None) -> str | None:
+        """Normalize empty/whitespace-only optional values to None (profile §I)."""
+        if v is not None and not v.strip():
+            return None
+        return v
+
+
 class CreateObjectiveInput(BaseModel):
     """Validated input for creating a new objective.
 
@@ -145,11 +182,15 @@ class CreateObjectiveInput(BaseModel):
     narrative: str | None = Field(
         default=None, max_length=MAX_NARRATIVE_LENGTH, description="Objective description"
     )
-    goal_type: str = Field(default="1", description="1=Team, 2=Personal")
+    objective_type: str = Field(
+        default="team",
+        validate_default=True,
+        description="'team' or 'individual' (also accepts '1'/'2')",
+    )
     permission: str = Field(
-        default="internal,team",
+        default="manager",
         max_length=MAX_PERMISSION_LENGTH,
-        description="Visibility setting",
+        description="Visibility setting (e.g. 'owner', 'manager', 'internal')",
     )
 
     @field_validator("start_date", "target_date")
@@ -160,13 +201,14 @@ class CreateObjectiveInput(BaseModel):
             raise ValueError(f"Date must be YYYY-MM-DD format, got: {v!r}")
         return v
 
-    @field_validator("goal_type")
+    @field_validator("objective_type")
     @classmethod
-    def goal_type_must_be_valid(cls, v: str) -> str:
-        """Validate goal_type is 1 or 2."""
-        if v not in ("1", "2"):
-            raise ValueError(f"goal_type must be '1' (Team) or '2' (Personal), got: {v!r}")
-        return v
+    def objective_type_must_be_valid(cls, v: str) -> str:
+        """Normalize objective_type to the API's goal_type encoding ('1'/'2')."""
+        normalized = _OBJECTIVE_TYPE_MAP.get(v.strip().lower())
+        if normalized is None:
+            raise ValueError(f"objective_type must be 'team' or 'individual', got: {v!r}")
+        return normalized
 
 
 MAX_WORKSTREAM_NAME_LENGTH = 500

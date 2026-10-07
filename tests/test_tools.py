@@ -36,6 +36,26 @@ class TestToolRegistration:
             func = getattr(tools_mod, name)
             assert callable(func), f"{name} is not callable"
 
+    @pytest.mark.asyncio
+    async def test_create_objective_registered_schema(self) -> None:
+        """The registered create tool must publish the nested KeyResultInput model
+        and the OKR-vocabulary objective_type param (profile §I, mcp-server.md:280)."""
+        from mcp_workboard_crunchtools.server import mcp
+
+        tool = await mcp.get_tool("workboard_create_objective_tool")
+        assert tool is not None
+        schema = tool.parameters
+
+        defs = schema.get("$defs", {})
+        assert "KeyResultInput" in defs, "nested key-result model not published"
+        kr = defs["KeyResultInput"]
+        assert kr["additionalProperties"] is False
+        assert {"name", "start_value", "target_value", "unit_type"}.issubset(kr["properties"])
+
+        props = schema["properties"]
+        assert "objective_type" in props
+        assert "goal_type" not in props
+
 
 class TestErrorSafety:
     """Tests to verify error messages don't leak sensitive data."""
@@ -390,6 +410,7 @@ class TestObjectiveTools:
         assert "objective" in result
         assert result["objective"]["name"] == "Retention"
         assert len(result["objective"]["key_results"]) == 1
+        assert result["objective"]["key_results"][0]["key_result_id"] == 300
 
     @pytest.mark.asyncio
     async def test_get_my_objectives(self) -> None:
@@ -469,9 +490,47 @@ class TestObjectiveTools:
                 owner="owner@example.com",
                 start_date="2026-01-01",
                 target_date="2026-12-31",
+                objective_type="team",
             )
 
         assert "objective" in result
+
+    @pytest.mark.asyncio
+    async def test_create_objective_maps_type_and_key_results(self) -> None:
+        """objective_type and key_results should map to the API's goal body."""
+        from mcp_workboard_crunchtools.models import KeyResultInput
+        from mcp_workboard_crunchtools.tools import create_objective
+
+        captured: dict[str, object] = {}
+
+        async def fake_post(_path: str, json_data: dict) -> dict:  # type: ignore[type-arg]
+            captured["json_data"] = json_data
+            return {"data": {"goal": {"goal_id": 501}}}
+
+        mock_client = AsyncMock()
+        mock_client.post = fake_post
+
+        with patch(
+            "mcp_workboard_crunchtools.tools.objectives.get_client",
+            return_value=mock_client,
+        ):
+            await create_objective(
+                name="Individual Obj",
+                owner="owner@example.com",
+                start_date="2026-01-01",
+                target_date="2026-12-31",
+                objective_type="individual",
+                key_results=[
+                    KeyResultInput(name="Ship it", target_value="100", unit_type="Number")
+                ],
+            )
+
+        goal = captured["json_data"]["goals"][0]  # type: ignore[index]
+        assert goal["goal_type"] == "2"  # individual → 2
+        assert goal["goal_permission"] == "manager"  # new default
+        assert goal["metrics"] == [
+            {"metric_name": "Ship it", "metric_target": "100", "metric_type": "Number"}
+        ]
 
 
 class TestKeyResultTools:
@@ -580,6 +639,9 @@ class TestKeyResultTools:
             result = await update_key_result(metric_id=10, value="75")
 
         assert "key_result" in result
+        # Return is normalized to OKR vocabulary, not the raw metric payload.
+        assert result["key_result"]["key_result_id"] == 10
+        assert "metric_id" not in result["key_result"]
 
 
 class TestWorkstreamTools:

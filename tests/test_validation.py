@@ -12,8 +12,10 @@ from mcp_workboard_crunchtools.errors import (
 )
 from mcp_workboard_crunchtools.models import (
     CreateActivityInput,
+    CreateObjectiveInput,
     CreateUserInput,
     CreateWorkstreamInput,
+    KeyResultInput,
     UpdateActivityInput,
     UpdateUserInput,
     UpdateWorkstreamInput,
@@ -457,3 +459,80 @@ class TestUpdateActivityInput:
                 ai_state="done",
                 ai_hidden=True,  # type: ignore[call-arg]
             )
+
+
+class TestCreateObjectiveInput:
+    """Tests for CreateObjectiveInput model."""
+
+    def _base(self, **overrides: str) -> dict[str, str]:
+        data = {
+            "name": "Objective",
+            "owner": "owner@example.com",
+            "start_date": "2026-01-01",
+            "target_date": "2026-12-31",
+        }
+        data.update(overrides)
+        return data
+
+    def test_defaults_are_team_and_manager(self) -> None:
+        """objective_type defaults to team ('1') and permission to 'manager'."""
+        obj = CreateObjectiveInput(**self._base())
+        assert obj.objective_type == "1"
+        assert obj.permission == "manager"
+
+    def test_objective_type_accepts_words_and_numbers(self) -> None:
+        """team/individual (any case) and 1/2 all normalize to the API encoding."""
+        assert CreateObjectiveInput(**self._base(objective_type="team")).objective_type == "1"
+        assert CreateObjectiveInput(**self._base(objective_type="Individual")).objective_type == "2"
+        assert CreateObjectiveInput(**self._base(objective_type="1")).objective_type == "1"
+        assert CreateObjectiveInput(**self._base(objective_type="2")).objective_type == "2"
+
+    def test_invalid_objective_type_rejected(self) -> None:
+        """An unknown objective_type is rejected with a clean message."""
+        with pytest.raises(ValidationError) as exc:
+            CreateObjectiveInput(**self._base(objective_type="squad"))
+        assert "objective_type" in str(exc.value)
+        assert "goal_type" not in str(exc.value)
+
+    def test_invalid_date_rejected(self) -> None:
+        """Dates must be YYYY-MM-DD."""
+        with pytest.raises(ValidationError):
+            CreateObjectiveInput(**self._base(start_date="01/01/2026"))
+
+    def test_extra_fields_rejected(self) -> None:
+        """Extra fields should be rejected."""
+        with pytest.raises(ValidationError):
+            CreateObjectiveInput(**self._base(goal_type="1"))
+
+
+class TestKeyResultInput:
+    """Tests for KeyResultInput model."""
+
+    def test_name_only_is_valid(self) -> None:
+        """A key result needs only a name; the rest default to None."""
+        kr = KeyResultInput(name="Ship it")
+        assert kr.name == "Ship it"
+        assert kr.start_value is None
+        assert kr.target_value is None
+        assert kr.unit_type is None
+
+    def test_blank_optionals_normalize_to_none(self) -> None:
+        """Empty/whitespace optionals become None (profile §I)."""
+        kr = KeyResultInput(name="Ship it", start_value="  ", target_value="")
+        assert kr.start_value is None
+        assert kr.target_value is None
+
+    def test_empty_name_rejected(self) -> None:
+        """Name is required and non-empty."""
+        with pytest.raises(ValidationError):
+            KeyResultInput(name="")
+
+    def test_overlong_value_rejected(self) -> None:
+        """Numeric value strings are length-bounded (constitution)."""
+        with pytest.raises(ValidationError):
+            KeyResultInput(name="Ship it", target_value="9" * 100)
+
+    def test_extra_fields_rejected(self) -> None:
+        """Extra fields should be rejected."""
+        with pytest.raises(ValidationError):
+            KeyResultInput(name="Ship it", metric_name="legacy")  # type: ignore[call-arg]

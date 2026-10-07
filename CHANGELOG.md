@@ -8,7 +8,28 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-07
+
+WorkBoard deployed a server-side fix (support ticket 122804715) for the 500 that
+had blocked Team-objective creation via the API, so objective creation now works
+for both Team and Individual objectives. This release unblocks that path and
+aligns the create tool with WorkBoard UI vocabulary.
+
 ### Changed
+- **`workboard_create_objective_tool`**: the `goal_type` parameter is now
+  `objective_type`, accepting `"team"` (default) or `"individual"` (numeric
+  `"1"`/`"2"` still accepted) instead of raw API codes.
+- **Fixed invalid default**: the objective `permission` default was
+  `"internal,team"`, which WorkBoard rejects; it is now `"manager"`.
+- **Key results on create** are now a declared `KeyResultInput` model
+  (`name`, `start_value`, `target_value`, `unit_type`) instead of a free-form
+  dict, satisfying the MCP Server profile's no-free-form-objects rule.
+- Key-result output key `metric_id` renamed to `key_result_id`;
+  `workboard_update_key_result_tool` now returns a normalized key result instead
+  of the raw WorkBoard metric payload.
+- Docstrings updated: objective creation is no longer described via raw
+  `goal_type`; added the note that the API has no update/delete for objectives
+  (UI-only).
 - Constitution is now a v1.18.0 manifest: only repo-specific facts remain;
   fleet and profile rules apply by reference.
 - Constitution validation is pinned via `.github/workflows/constitution.yml`.
