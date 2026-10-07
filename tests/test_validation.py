@@ -474,11 +474,17 @@ class TestCreateObjectiveInput:
         data.update(overrides)
         return data
 
-    def test_defaults_are_team_and_manager(self) -> None:
-        """objective_type defaults to team ('1') and permission to 'manager'."""
+    def test_defaults(self) -> None:
+        """objective_type defaults to team ('1'), permission to a valid team value."""
         obj = CreateObjectiveInput(**self._base())
         assert obj.objective_type == "1"
-        assert obj.permission == "manager"
+        assert obj.permission == "internal,team"
+        assert obj.team is None
+
+    def test_blank_team_normalizes_to_none(self) -> None:
+        """Whitespace-only team becomes None (profile §I)."""
+        assert CreateObjectiveInput(**self._base(team="  ")).team is None
+        assert CreateObjectiveInput(**self._base(team="561838")).team == "561838"
 
     def test_objective_type_accepts_words_and_numbers(self) -> None:
         """team/individual (any case) and 1/2 all normalize to the API encoding."""

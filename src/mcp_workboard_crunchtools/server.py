@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.9.0",
+    version="0.10.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -327,7 +327,8 @@ async def workboard_create_objective_tool(
     target_date: str,
     narrative: str | None = None,
     objective_type: str = "team",
-    permission: str = "manager",
+    team: str | None = None,
+    permission: str = "internal,team",
     key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results.
@@ -336,9 +337,10 @@ async def workboard_create_objective_tool(
     has the Data-Admin role; instant JWT tokens cannot create objectives. The API
     has no update or delete for objectives — those are UI-only.
 
-    Provide the objective name, owner, dates, and optionally key results with
-    targets. Each key result has a name and optional start_value, target_value,
-    and unit_type (e.g. "Number", "Currency", "Percent").
+    Team objectives must be tied to a team: pass ``team`` (a team ID from
+    workboard_get_teams_tool). Provide the objective name, owner, dates, and
+    optionally key results with targets. Each key result has a name and optional
+    start_value, target_value, and unit_type (e.g. "Number", "Currency", "Percent").
 
     Args:
         name: Objective name (e.g. "Increase customer retention")
@@ -347,7 +349,9 @@ async def workboard_create_objective_tool(
         target_date: Target completion date in YYYY-MM-DD format
         narrative: Optional description/narrative for the objective
         objective_type: "team" (default) or "individual"
-        permission: Visibility setting (e.g. "owner", "manager", "internal")
+        team: Team ID (or name) — required for team objectives, ignored for individual
+        permission: Visibility, comma-separated. Team objectives accept
+                    team/report/internal/any (default "internal,team").
         key_results: Optional list of key results, each with a name and optional
                      start_value, target_value, and unit_type
 
@@ -361,6 +365,7 @@ async def workboard_create_objective_tool(
         target_date=target_date,
         narrative=narrative,
         objective_type=objective_type,
+        team=team,
         permission=permission,
         key_results=key_results,
     )

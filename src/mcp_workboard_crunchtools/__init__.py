@@ -6,7 +6,7 @@ import sys
 
 from .server import mcp
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __all__ = ["main", "mcp"]
 
 

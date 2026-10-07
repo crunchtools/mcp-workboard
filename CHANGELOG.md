@@ -8,6 +8,25 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-07
+
+Live API testing against the fixed WorkBoard endpoint (goal_id 3006602 created
+successfully) revealed two defects in the 0.9.0 create path, both fixed here.
+
+### Added
+- **`team` parameter on `workboard_create_objective_tool`** — team objectives
+  require a team association (`goal_team`); without it the API rejects the call.
+  Pass `team=<team id>` (from `workboard_get_teams_tool`). A team objective
+  created without a team now fails fast with a clear message instead of a
+  confusing API error.
+
+### Fixed
+- **Objective `permission` default reverted to `"internal,team"`.** The 0.9.0
+  change to `"manager"` was based on an incorrect assumption; the live API
+  rejects `"manager"` for team objectives (valid: team/report/internal/any,
+  comma-separated) and accepts `"internal,team"`. The original default was
+  correct all along.
+
 ## [0.9.0] - 2026-10-07
 
 WorkBoard deployed a server-side fix (support ticket 122804715) for the 500 that

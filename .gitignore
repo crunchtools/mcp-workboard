@@ -96,3 +96,6 @@ Thumbs.db
 
 # MCP Registry auth tokens
 .mcpregistry_*
+
+# Local Claude Code settings
+.claude/
