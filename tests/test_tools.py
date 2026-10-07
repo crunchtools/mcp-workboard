@@ -54,6 +54,7 @@ class TestToolRegistration:
 
         props = schema["properties"]
         assert "objective_type" in props
+        assert "team" in props
         assert "goal_type" not in props
 
 
@@ -491,9 +492,25 @@ class TestObjectiveTools:
                 start_date="2026-01-01",
                 target_date="2026-12-31",
                 objective_type="team",
+                team="561838",
             )
 
         assert "objective" in result
+
+    @pytest.mark.asyncio
+    async def test_create_team_objective_requires_team(self) -> None:
+        """A team objective without a team is rejected before any API call."""
+        from mcp_workboard_crunchtools.errors import UserError
+        from mcp_workboard_crunchtools.tools import create_objective
+
+        with pytest.raises(UserError, match="team objective requires a team"):
+            await create_objective(
+                name="No Team",
+                owner="owner@example.com",
+                start_date="2026-01-01",
+                target_date="2026-12-31",
+                objective_type="team",
+            )
 
     @pytest.mark.asyncio
     async def test_create_objective_maps_type_and_key_results(self) -> None:
@@ -527,10 +544,42 @@ class TestObjectiveTools:
 
         goal = captured["json_data"]["goals"][0]  # type: ignore[index]
         assert goal["goal_type"] == "2"  # individual → 2
-        assert goal["goal_permission"] == "manager"  # new default
+        assert goal["goal_permission"] == "internal,team"  # default
+        assert "goal_team" not in goal  # individual objectives carry no team
         assert goal["metrics"] == [
             {"metric_name": "Ship it", "metric_target": "100", "metric_type": "Number"}
         ]
+
+    @pytest.mark.asyncio
+    async def test_create_team_objective_maps_team(self) -> None:
+        """A team objective sends goal_team as [{'id': <team>}]."""
+        from mcp_workboard_crunchtools.tools import create_objective
+
+        captured: dict[str, object] = {}
+
+        async def fake_post(_path: str, json_data: dict) -> dict:  # type: ignore[type-arg]
+            captured["json_data"] = json_data
+            return {"data": {"goal": {"goal_id": 502}}}
+
+        mock_client = AsyncMock()
+        mock_client.post = fake_post
+
+        with patch(
+            "mcp_workboard_crunchtools.tools.objectives.get_client",
+            return_value=mock_client,
+        ):
+            await create_objective(
+                name="Team Obj",
+                owner="owner@example.com",
+                start_date="2026-01-01",
+                target_date="2026-12-31",
+                objective_type="team",
+                team="561838",
+            )
+
+        goal = captured["json_data"]["goals"][0]  # type: ignore[index]
+        assert goal["goal_type"] == "1"
+        assert goal["goal_team"] == [{"id": "561838"}]
 
 
 class TestKeyResultTools:

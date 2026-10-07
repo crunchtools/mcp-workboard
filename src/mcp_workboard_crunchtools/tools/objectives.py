@@ -578,7 +578,8 @@ async def create_objective(
     target_date: str,
     narrative: str | None = None,
     objective_type: str = "team",
-    permission: str = "manager",
+    team: str | None = None,
+    permission: str = "internal,team",
     key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results.
@@ -596,7 +597,9 @@ async def create_objective(
         target_date: Target completion date (YYYY-MM-DD format)
         narrative: Optional description/narrative for the objective
         objective_type: "team" (default) or "individual"
-        permission: Visibility setting (e.g. "owner", "manager", "internal")
+        team: Team ID (or name) — required for team objectives, ignored for individual
+        permission: Visibility, comma-separated. Team objectives accept
+                    team/report/internal/any (default "internal,team").
         key_results: Optional list of key results, each with a name and optional
                      start_value, target_value, and unit_type
 
@@ -610,8 +613,16 @@ async def create_objective(
         target_date=target_date,
         narrative=narrative,
         objective_type=objective_type,
+        team=team,
         permission=permission,
     )
+
+    # goal_type "1" is a team objective, which the API requires be tied to a team.
+    if validated.objective_type == "1" and validated.team is None:
+        raise UserError(
+            "A team objective requires a team. Pass team=<team id>, or set "
+            "objective_type='individual'. Find team IDs with workboard_get_teams_tool."
+        )
 
     goal: dict[str, Any] = {
         "goal_name": validated.name,
@@ -621,6 +632,9 @@ async def create_objective(
         "goal_type": validated.objective_type,
         "goal_permission": validated.permission,
     }
+
+    if validated.team is not None:
+        goal["goal_team"] = [{"id": validated.team}]
 
     if validated.narrative is not None:
         goal["goal_narrative"] = validated.narrative

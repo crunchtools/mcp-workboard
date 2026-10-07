@@ -187,11 +187,24 @@ class CreateObjectiveInput(BaseModel):
         validate_default=True,
         description="'team' or 'individual' (also accepts '1'/'2')",
     )
-    permission: str = Field(
-        default="manager",
-        max_length=MAX_PERMISSION_LENGTH,
-        description="Visibility setting (e.g. 'owner', 'manager', 'internal')",
+    team: str | None = Field(
+        default=None,
+        max_length=MAX_NAME_LENGTH,
+        description="Team ID or name — required for team objectives, ignored for individual",
     )
+    permission: str = Field(
+        default="internal,team",
+        max_length=MAX_PERMISSION_LENGTH,
+        description="Visibility, comma-separated (team objectives: team/report/internal/any)",
+    )
+
+    @field_validator("team")
+    @classmethod
+    def blank_team_is_unset(cls, v: str | None) -> str | None:
+        """Normalize empty/whitespace-only team to None (profile §I)."""
+        if v is not None and not v.strip():
+            return None
+        return v
 
     @field_validator("start_date", "target_date")
     @classmethod

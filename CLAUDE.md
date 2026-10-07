@@ -88,7 +88,7 @@ Update key result 12345 to 75
 Show me my teams
 Who is on team 5678?
 Show key results for user 99
-Create a team objective called "Increase retention" owned by user@example.com
+Create a team objective called "Increase retention" owned by user@example.com on team 561838
 Create an individual objective called "Grow my skills" owned by user@example.com
 Show me my workstreams
 Show me the action items for workstream 100
