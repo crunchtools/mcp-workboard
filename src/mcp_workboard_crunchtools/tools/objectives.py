@@ -14,6 +14,7 @@ from ..client import get_client
 from ..errors import UserError
 from ..models import (
     CreateObjectiveInput,
+    KeyResultInput,
     UpdateKeyResultInput,
     validate_metric_id,
     validate_objective_id,
@@ -69,7 +70,7 @@ def _format_metric(
             progress_str = f"{int(achieved)}% of {int(target)}%"
 
     formatted_metric: dict[str, Any] = {
-        "metric_id": int(metric.get("metric_id", 0)),
+        "key_result_id": int(metric.get("metric_id", 0)),
         "name": metric.get("metric_name", ""),
         "progress": progress_str,
         "target_date": target_date_override or _format_date(metric.get("target_date")),
@@ -523,7 +524,7 @@ async def update_key_result(
     if current_value is not None and new_value < current_value:
         warning = (
             f"Value decreased from {current_value} to {new_value} "
-            f"for '{metric_name}' (metric_id={metric_id})"
+            f"for '{metric_name}' (key_result_id={metric_id})"
         )
         logger.warning("AUDIT: Key result decrease — %s", warning)
 
@@ -540,10 +541,34 @@ async def update_key_result(
         validated.comment or "(none)",
     )
 
-    result: dict[str, Any] = {"key_result": response}
+    # Normalize the raw PUT response to OKR vocabulary rather than leaking the
+    # API's metric_* fields back to the caller.
+    updated = response.get("metric") if isinstance(response, dict) else None
+    if updated is None and isinstance(response, dict):
+        updated = response.get("data", {}).get("metric")
+    if isinstance(updated, list):
+        updated = updated[0] if updated else None
+    if isinstance(updated, dict) and updated.get("metric_id") is not None:
+        formatted_key_result: dict[str, Any] = _format_metric(updated)
+    else:
+        formatted_key_result = {"key_result_id": metric_id, "value": validated.value}
+
+    result: dict[str, Any] = {"key_result": formatted_key_result}
     if warning:
         result["warning"] = warning
     return result
+
+
+def _key_result_to_metric(kr: KeyResultInput) -> dict[str, str]:
+    """Map an OKR-vocabulary key result to the WorkBoard API's ``metric_*`` fields."""
+    metric: dict[str, str] = {"metric_name": kr.name}
+    if kr.start_value is not None:
+        metric["metric_start"] = kr.start_value
+    if kr.target_value is not None:
+        metric["metric_target"] = kr.target_value
+    if kr.unit_type is not None:
+        metric["metric_type"] = kr.unit_type
+    return metric
 
 
 async def create_objective(
@@ -552,11 +577,17 @@ async def create_objective(
     start_date: str,
     target_date: str,
     narrative: str | None = None,
-    goal_type: str = "1",
-    permission: str = "internal,team",
-    key_results: list[dict[str, str]] | None = None,
+    objective_type: str = "team",
+    permission: str = "manager",
+    key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
-    """Create a new objective with optional key results (requires Data-Admin token).
+    """Create a new objective with optional key results.
+
+    Creating both Team and Individual objectives works via the API. Objective
+    creation requires an OAuth token whose account has the Data-Admin role;
+    instant JWT tokens (``isSuperUser: false``) cannot create objectives.
+    Note: the API has no update or delete for objectives — edits and deletes
+    must be done in the WorkBoard UI.
 
     Args:
         name: Objective name
@@ -564,10 +595,10 @@ async def create_objective(
         start_date: Start date (YYYY-MM-DD format)
         target_date: Target completion date (YYYY-MM-DD format)
         narrative: Optional description/narrative for the objective
-        goal_type: "1" for Team objective, "2" for Personal objective
-        permission: Visibility setting (default "internal,team")
-        key_results: Optional list of key result dicts, each with keys like
-                     "metric_name", "metric_start", "metric_target", "metric_type"
+        objective_type: "team" (default) or "individual"
+        permission: Visibility setting (e.g. "owner", "manager", "internal")
+        key_results: Optional list of key results, each with a name and optional
+                     start_value, target_value, and unit_type
 
     Returns:
         Created objective details
@@ -578,7 +609,7 @@ async def create_objective(
         start_date=start_date,
         target_date=target_date,
         narrative=narrative,
-        goal_type=goal_type,
+        objective_type=objective_type,
         permission=permission,
     )
 
@@ -587,15 +618,17 @@ async def create_objective(
         "goal_owner": validated.owner,
         "goal_start_date": validated.start_date,
         "goal_target_date": validated.target_date,
-        "goal_type": validated.goal_type,
+        "goal_type": validated.objective_type,
         "goal_permission": validated.permission,
     }
 
     if validated.narrative is not None:
         goal["goal_narrative"] = validated.narrative
 
-    if key_results is not None:
-        goal["metrics"] = key_results
+    if key_results:
+        goal["metrics"] = [
+            _key_result_to_metric(KeyResultInput.model_validate(kr)) for kr in key_results
+        ]
 
     client = get_client()
 

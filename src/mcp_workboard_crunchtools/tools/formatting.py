@@ -74,4 +74,3 @@ def add_action_item_details(formatted: dict[str, Any], ai: dict[str, Any]) -> No
             for lm in loop_members
             if isinstance(lm, dict)
         ]
-

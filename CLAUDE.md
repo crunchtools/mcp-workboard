@@ -35,7 +35,9 @@ claude mcp add mcp-workboard \
 
 Two auth modes, chosen by which environment variables are set:
 
-**Static JWT Token** — Set `WORKBOARD_API_TOKEN` or `WORKBOARD_API_TOKEN_FILE`. Quick setup but limited permissions (instant tokens have `isSuperUser: false`, blocking objective creation).
+**Static JWT Token** — Set `WORKBOARD_API_TOKEN` or `WORKBOARD_API_TOKEN_FILE`. Quick setup but limited permissions: instant tokens have `isSuperUser: false`, which blocks objective and key-result creation (reads work fine). Use OAuth for writes.
+
+> **API limitation:** the WorkBoard Goal resource exposes only GET and POST — there is no update or delete for objectives via the API. Edit or delete objectives in the WorkBoard UI. (Key results *can* be updated via `/metric`.)
 
 **OAuth 2** — Set `WORKBOARD_CLIENT_ID` + `WORKBOARD_CLIENT_SECRET`, then run `mcp-workboard-crunchtools login`. This opens your browser for WorkBoard authorization and saves tokens to `~/.config/mcp-workboard/tokens.json`. OAuth tokens carry your full user permissions. Tokens auto-refresh when expired.
 
@@ -86,7 +88,8 @@ Update key result 12345 to 75
 Show me my teams
 Who is on team 5678?
 Show key results for user 99
-Create an objective called "Increase retention" owned by user@example.com
+Create a team objective called "Increase retention" owned by user@example.com
+Create an individual objective called "Grow my skills" owned by user@example.com
 Show me my workstreams
 Show me the action items for workstream 100
 Show workstreams for team 5678

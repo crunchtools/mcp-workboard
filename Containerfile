@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir .
 FROM quay.io/hummingbird/python:latest
 
 LABEL name="mcp-workboard-crunchtools" \
-      version="0.7.0" \
+      version="0.9.0" \
       summary="Secure MCP server for WorkBoard OKR and strategy execution" \
       description="A security-focused MCP server for WorkBoard built on Red Hat UBI" \
       maintainer="crunchtools.com" \
