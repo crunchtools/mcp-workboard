@@ -8,6 +8,30 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-09
+
+Live API testing (via the MCP server against the production endpoint) found that
+the two create-path features shipped in 0.9.0/0.10.0 never actually worked. Both
+are fixed here; both root causes were a mismatch between what the tool sent and
+what the WorkBoard API accepts.
+
+### Fixed
+- **Key results on create were silently dropped.** `workboard_create_objective_tool`
+  sent key results under a `metrics` array using `metric_start`/`metric_type`
+  (a unit string like `"Percent"`). The API embeds key results under `goal_metrics`
+  with `metric_initial_data` and a numeric `metric_unit` (`1` number / `2` currency
+  / `3` percent), and silently discards metrics missing the cadence fields
+  (`metric_source_from`, `metric_update_interval`, `metric_counting_type`,
+  `metric_progress_type`). The mapping now emits the correct field names, maps
+  unit names to codes, and fills sensible cadence defaults. Verified live:
+  objectives now create with their key results attached.
+- **Individual objective creation always failed.** The flat default permission
+  `"internal,team"` is invalid for personal goals, and — despite the API's error
+  message listing it — the API also rejects `"internal"` for personal goals.
+  The permission default is now type-aware: team → `"internal,team"`,
+  individual → `"owner"` (personal goals accept `owner`/`manager`). An explicit
+  permission is still passed through unchanged.
+
 ## [0.10.0] - 2026-10-07
 
 Live API testing against the fixed WorkBoard endpoint (goal_id 3006602 created

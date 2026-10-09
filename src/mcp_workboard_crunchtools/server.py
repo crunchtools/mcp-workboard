@@ -328,7 +328,7 @@ async def workboard_create_objective_tool(
     narrative: str | None = None,
     objective_type: str = "team",
     team: str | None = None,
-    permission: str = "internal,team",
+    permission: str | None = None,
     key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results.
@@ -351,7 +351,9 @@ async def workboard_create_objective_tool(
         objective_type: "team" (default) or "individual"
         team: Team ID (or name) — required for team objectives, ignored for individual
         permission: Visibility, comma-separated. Team objectives accept
-                    team/report/internal/any (default "internal,team").
+                    team/report/internal/any; personal objectives accept
+                    owner/manager. Defaults by type when omitted (team →
+                    "internal,team", individual → "owner").
         key_results: Optional list of key results, each with a name and optional
                      start_value, target_value, and unit_type
 

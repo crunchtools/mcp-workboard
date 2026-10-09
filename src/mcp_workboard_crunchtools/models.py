@@ -2,7 +2,7 @@
 
 import re
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .errors import (
     InvalidActivityIdError,
@@ -131,6 +131,35 @@ class UpdateKeyResultInput(BaseModel):
 # are accepted too for back-compat.
 _OBJECTIVE_TYPE_MAP = {"team": "1", "1": "1", "individual": "2", "2": "2"}
 
+# WorkBoard UI unit vocabulary → API metric_unit encoding. The API field is an
+# opaque numeric string; agents speak in the UI's terms ("Number"/"Currency"/
+# "Percent"). Numeric strings are accepted too. Unknown values fall back to "1".
+_METRIC_UNIT_MAP = {
+    "number": "1",
+    "num": "1",
+    "1": "1",
+    "currency": "2",
+    "money": "2",
+    "2": "2",
+    "percent": "3",
+    "percentage": "3",
+    "%": "3",
+    "3": "3",
+}
+
+
+def metric_unit_code(unit_type: str | None) -> str:
+    """Map a UI unit name to the API's ``metric_unit`` code, defaulting to number."""
+    if unit_type is None:
+        return "1"
+    return _METRIC_UNIT_MAP.get(unit_type.strip().lower(), "1")
+
+
+# Type-aware default visibility. Team goals accept team/report/internal/any;
+# personal goals accept owner/manager (the API rejects "internal" for personal
+# goals despite listing it as valid). These defaults are the always-accepted case.
+_DEFAULT_PERMISSION_BY_TYPE = {"1": "internal,team", "2": "owner"}
+
 
 class KeyResultInput(BaseModel):
     """A key result to attach to a new objective.
@@ -192,19 +221,35 @@ class CreateObjectiveInput(BaseModel):
         max_length=MAX_NAME_LENGTH,
         description="Team ID or name — required for team objectives, ignored for individual",
     )
-    permission: str = Field(
-        default="internal,team",
+    permission: str | None = Field(
+        default=None,
         max_length=MAX_PERMISSION_LENGTH,
-        description="Visibility, comma-separated (team objectives: team/report/internal/any)",
+        description=(
+            "Visibility, comma-separated. Team objectives accept team/report/internal/any; "
+            "personal objectives accept owner/manager. Defaults by type when omitted "
+            "(team → 'internal,team', individual → 'owner')."
+        ),
     )
 
-    @field_validator("team")
+    @field_validator("team", "permission")
     @classmethod
-    def blank_team_is_unset(cls, v: str | None) -> str | None:
-        """Normalize empty/whitespace-only team to None (profile §I)."""
+    def blank_is_unset(cls, v: str | None) -> str | None:
+        """Normalize empty/whitespace-only optional values to None (profile §I)."""
         if v is not None and not v.strip():
             return None
         return v
+
+    @model_validator(mode="after")
+    def default_permission_by_type(self) -> "CreateObjectiveInput":
+        """Fill a type-appropriate permission default when none was supplied.
+
+        objective_type is already normalized to the API's "1"/"2" encoding at this
+        point. The old flat "internal,team" default was rejected by the API for
+        personal objectives, so the default now depends on the objective type.
+        """
+        if self.permission is None:
+            self.permission = _DEFAULT_PERMISSION_BY_TYPE[self.objective_type]
+        return self
 
     @field_validator("start_date", "target_date")
     @classmethod
