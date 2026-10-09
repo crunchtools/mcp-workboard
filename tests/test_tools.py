@@ -544,11 +544,24 @@ class TestObjectiveTools:
 
         goal = captured["json_data"]["goals"][0]  # type: ignore[index]
         assert goal["goal_type"] == "2"  # individual → 2
-        assert goal["goal_permission"] == "internal,team"  # default
+        assert goal["goal_permission"] == "owner"  # individual default (API rejects "internal")
         assert "goal_team" not in goal  # individual objectives carry no team
-        assert goal["metrics"] == [
-            {"metric_name": "Ship it", "metric_target": "100", "metric_type": "Number"}
+        # Key results go under goal_metrics with the API's real field names;
+        # unit_type maps to a numeric metric_unit and cadence fields are filled.
+        assert goal["goal_metrics"] == [
+            {
+                "metric_name": "Ship it",
+                "metric_owner": "owner@example.com",
+                "metric_initial_data": "0",
+                "metric_unit": "1",  # Number → 1
+                "metric_source_from": "1",
+                "metric_update_interval": "3",
+                "metric_counting_type": "1",
+                "metric_progress_type": "1",
+                "metric_target": "100",
+            }
         ]
+        assert "metrics" not in goal  # the old, silently-dropped key is gone
 
     @pytest.mark.asyncio
     async def test_create_team_objective_maps_team(self) -> None:
@@ -580,6 +593,7 @@ class TestObjectiveTools:
         goal = captured["json_data"]["goals"][0]  # type: ignore[index]
         assert goal["goal_type"] == "1"
         assert goal["goal_team"] == [{"id": "561838"}]
+        assert goal["goal_permission"] == "internal,team"  # team default unchanged
 
 
 class TestKeyResultTools:

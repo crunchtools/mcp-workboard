@@ -19,6 +19,7 @@ from mcp_workboard_crunchtools.models import (
     UpdateActivityInput,
     UpdateUserInput,
     UpdateWorkstreamInput,
+    metric_unit_code,
     validate_activity_id,
     validate_metric_id,
     validate_objective_id,
@@ -481,6 +482,22 @@ class TestCreateObjectiveInput:
         assert obj.permission == "internal,team"
         assert obj.team is None
 
+    def test_individual_permission_default_is_owner(self) -> None:
+        """Individual objectives default to 'owner' — the API rejects 'internal' here."""
+        obj = CreateObjectiveInput(**self._base(objective_type="individual"))
+        assert obj.objective_type == "2"
+        assert obj.permission == "owner"
+
+    def test_explicit_permission_is_preserved(self) -> None:
+        """An explicitly supplied permission overrides the type default."""
+        obj = CreateObjectiveInput(**self._base(objective_type="individual", permission="manager"))
+        assert obj.permission == "manager"
+
+    def test_blank_permission_normalizes_to_type_default(self) -> None:
+        """Whitespace-only permission is treated as unset, then defaulted by type."""
+        obj = CreateObjectiveInput(**self._base(permission="   "))
+        assert obj.permission == "internal,team"
+
     def test_blank_team_normalizes_to_none(self) -> None:
         """Whitespace-only team becomes None (profile §I)."""
         assert CreateObjectiveInput(**self._base(team="  ")).team is None
@@ -537,6 +554,15 @@ class TestKeyResultInput:
         """Numeric value strings are length-bounded (constitution)."""
         with pytest.raises(ValidationError):
             KeyResultInput(name="Ship it", target_value="9" * 100)
+
+    def test_unit_code_mapping(self) -> None:
+        """UI unit names map to the API's numeric metric_unit; unknown falls back to number."""
+        assert metric_unit_code("Number") == "1"
+        assert metric_unit_code("currency") == "2"
+        assert metric_unit_code("Percent") == "3"
+        assert metric_unit_code("%") == "3"
+        assert metric_unit_code(None) == "1"
+        assert metric_unit_code("gibberish") == "1"
 
     def test_extra_fields_rejected(self) -> None:
         """Extra fields should be rejected."""

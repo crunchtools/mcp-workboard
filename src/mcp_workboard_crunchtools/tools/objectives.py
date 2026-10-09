@@ -16,6 +16,7 @@ from ..models import (
     CreateObjectiveInput,
     KeyResultInput,
     UpdateKeyResultInput,
+    metric_unit_code,
     validate_metric_id,
     validate_objective_id,
     validate_user_id,
@@ -559,15 +560,34 @@ async def update_key_result(
     return result
 
 
-def _key_result_to_metric(kr: KeyResultInput) -> dict[str, str]:
-    """Map an OKR-vocabulary key result to the WorkBoard API's ``metric_*`` fields."""
-    metric: dict[str, str] = {"metric_name": kr.name}
-    if kr.start_value is not None:
-        metric["metric_start"] = kr.start_value
+# Without these cadence/shape fields — metric_source_from above all — the API
+# silently drops the metric from a goal-create call instead of erroring (verified
+# live). Defaults: individual-sourced, monthly, counting up, scored on last update.
+_METRIC_DEFAULTS = {
+    "metric_source_from": "1",  # sourced from an individual user
+    "metric_update_interval": "3",  # monthly
+    "metric_counting_type": "1",  # counting up
+    "metric_progress_type": "1",  # last update
+}
+
+
+def _key_result_to_metric(kr: KeyResultInput, owner: str) -> dict[str, str]:
+    """Map an OKR-vocabulary key result to the WorkBoard API's ``metric_*`` fields.
+
+    The API creates key results only through the ``goal_metrics`` array on a
+    goal-create call, and only when the field names and cadence fields match its
+    contract. ``start_value``/``unit_type`` map to ``metric_initial_data``/a numeric
+    ``metric_unit``, not the ``metric_start``/``metric_type`` the early code sent.
+    """
+    metric: dict[str, str] = {
+        "metric_name": kr.name,
+        "metric_owner": owner,
+        "metric_initial_data": kr.start_value or "0",
+        "metric_unit": metric_unit_code(kr.unit_type),
+        **_METRIC_DEFAULTS,
+    }
     if kr.target_value is not None:
         metric["metric_target"] = kr.target_value
-    if kr.unit_type is not None:
-        metric["metric_type"] = kr.unit_type
     return metric
 
 
@@ -579,7 +599,7 @@ async def create_objective(
     narrative: str | None = None,
     objective_type: str = "team",
     team: str | None = None,
-    permission: str = "internal,team",
+    permission: str | None = None,
     key_results: list[KeyResultInput] | None = None,
 ) -> dict[str, Any]:
     """Create a new objective with optional key results.
@@ -599,7 +619,9 @@ async def create_objective(
         objective_type: "team" (default) or "individual"
         team: Team ID (or name) — required for team objectives, ignored for individual
         permission: Visibility, comma-separated. Team objectives accept
-                    team/report/internal/any (default "internal,team").
+                    team/report/internal/any; personal objectives accept
+                    owner/manager. Defaults by type when omitted (team →
+                    "internal,team", individual → "owner").
         key_results: Optional list of key results, each with a name and optional
                      start_value, target_value, and unit_type
 
@@ -640,8 +662,9 @@ async def create_objective(
         goal["goal_narrative"] = validated.narrative
 
     if key_results:
-        goal["metrics"] = [
-            _key_result_to_metric(KeyResultInput.model_validate(kr)) for kr in key_results
+        goal["goal_metrics"] = [
+            _key_result_to_metric(KeyResultInput.model_validate(kr), validated.owner)
+            for kr in key_results
         ]
 
     client = get_client()
