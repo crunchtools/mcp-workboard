@@ -57,7 +57,6 @@ class TokenStore:
         else:
             self._path = DEFAULT_TOKEN_STORE_PATH
         self._cached: TokenData | None = None
-        self._loaded_sig: tuple[int, int] | None = None
         self._refresh_mutex = Lock()
 
     @property
@@ -115,18 +114,12 @@ class TokenStore:
     def _reload(self) -> TokenData | None:
         """Re-read the store so a token refreshed by another process (the login
         CLI, or another instance sharing a mounted store) is picked up without
-        restarting this process. Gated on a stat() of mtime and size, so the hot
-        path re-parses only when the file actually changed."""
-        try:
-            st = self._path.stat()
-        except OSError:
-            return self._cached
-        sig = (st.st_mtime_ns, st.st_size)
-        if sig != self._loaded_sig:
-            disk = self.load()
-            if disk is not None:
-                self._cached = disk
-                self._loaded_sig = sig
+        restarting this process. The token file is small and local, so reading it
+        per call is cheap next to the API round-trip, and always reading is
+        correct regardless of filesystem timestamp resolution."""
+        disk = self.load()
+        if disk is not None:
+            self._cached = disk
         return self._cached
 
     @contextmanager

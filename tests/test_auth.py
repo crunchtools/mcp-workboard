@@ -208,31 +208,6 @@ class TestTokenStore:
         assert token == "fresh-external"
         mock_client.assert_not_called()
 
-    def test_get_access_token_skips_reparse_when_unchanged(self, tmp_path: Path) -> None:
-        store = TokenStore(path=tmp_path / "tokens.json")
-        store.save(
-            TokenData(
-                access_token=SecretStr("valid"),
-                refresh_token=SecretStr("refresh"),
-                expires_at=time.time() + 3600,
-            )
-        )
-        # Prime the cache and the stat signature.
-        store.get_access_token(
-            client_id="cid",
-            client_secret=SecretStr("csecret"),
-            token_url=FAKE_TOKEN_URL,
-        )
-        # File unchanged: the hot path stats but does not re-read and parse.
-        with patch.object(store, "load", wraps=store.load) as spy:
-            token = store.get_access_token(
-                client_id="cid",
-                client_secret=SecretStr("csecret"),
-                token_url=FAKE_TOKEN_URL,
-            )
-        assert token == "valid"
-        spy.assert_not_called()
-
     def test_refresh_lock_acquires_and_releases(self, tmp_path: Path) -> None:
         path = tmp_path / "tokens.json"
         store = TokenStore(path=path)
