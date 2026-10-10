@@ -8,6 +8,25 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-10
+
+### Fixed
+- **OAuth token store is re-read on every call, not cached for the process
+  lifetime.** `TokenStore` loaded the token file once and then served the
+  in-memory copy forever, so a token refreshed by another process (the `login`
+  CLI, or another instance sharing a mounted store) was ignored until the server
+  restarted. A long-running container would keep presenting a stale, rejected
+  refresh token and return `Token refresh failed: 400` even right after a fresh
+  login. `get_access_token` now reloads the store before checking expiry and
+  before refreshing, so an externally refreshed token is picked up without a
+  restart.
+- **Refreshes are serialized across processes with a file lock.** The WorkBoard
+  refresh token is single-use and rotates, so two instances sharing the store
+  could refresh at once and invalidate each other. Refresh now runs under an
+  exclusive lock on a sibling `.lock` file, with a double-checked reload inside
+  the lock so a waiter uses the token a peer just wrote instead of spending its
+  own.
+
 ## [0.11.0] - 2026-10-10
 
 ### Added

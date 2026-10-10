@@ -180,6 +180,43 @@ class TestTokenStore:
         assert reloaded is not None
         assert reloaded.access_token.get_secret_value() == "new-token"
 
+    def test_get_access_token_reloads_external_update(self, tmp_path: Path) -> None:
+        path = tmp_path / "tokens.json"
+        store = TokenStore(path=path)
+        store.save(
+            TokenData(
+                access_token=SecretStr("stale"),
+                refresh_token=SecretStr("refresh"),
+                expires_at=time.time() - 100,
+            )
+        )
+        # Another process (e.g. the login CLI) writes a fresh token to the
+        # shared store after this instance cached the stale one.
+        TokenStore(path=path).save(
+            TokenData(
+                access_token=SecretStr("fresh-external"),
+                refresh_token=SecretStr("refresh"),
+                expires_at=time.time() + 3600,
+            )
+        )
+        with patch("mcp_workboard_crunchtools.auth.httpx.Client") as mock_client:
+            token = store.get_access_token(
+                client_id="cid",
+                client_secret=SecretStr("csecret"),
+                token_url=FAKE_TOKEN_URL,
+            )
+        assert token == "fresh-external"
+        mock_client.assert_not_called()
+
+    def test_refresh_lock_acquires_and_releases(self, tmp_path: Path) -> None:
+        path = tmp_path / "tokens.json"
+        store = TokenStore(path=path)
+        with store._refresh_lock():
+            assert path.with_name(path.name + ".lock").exists()
+        # Released: a second acquisition does not block.
+        with store._refresh_lock():
+            pass
+
 
 class TestParseTokenResponse:
     """Tests for _parse_token_response."""

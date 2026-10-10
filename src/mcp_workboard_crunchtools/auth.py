@@ -9,11 +9,18 @@ import secrets
 import stat
 import time
 import webbrowser
+from collections.abc import Iterator
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from threading import Thread
+from threading import Lock, Thread
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no fcntl
+    fcntl = None  # type: ignore[assignment]
 
 import httpx
 from pydantic import BaseModel, SecretStr
@@ -50,6 +57,7 @@ class TokenStore:
         else:
             self._path = DEFAULT_TOKEN_STORE_PATH
         self._cached: TokenData | None = None
+        self._refresh_mutex = Lock()
 
     @property
     def path(self) -> Path:
@@ -99,50 +107,102 @@ class TokenStore:
         self._cached = token_data
         logger.info("Tokens saved to %s", self._path)
 
+    @staticmethod
+    def _is_valid(token: TokenData) -> bool:
+        return time.time() < token.expires_at - REFRESH_MARGIN_SECONDS
+
+    def _reload(self) -> TokenData | None:
+        """Re-read the store so a token refreshed by another process (the login
+        CLI, or another instance sharing a mounted store) is picked up without
+        restarting this process. The token file is small and local, so reading it
+        per call is cheap next to the API round-trip, and always reading is
+        correct regardless of filesystem timestamp resolution."""
+        disk = self.load()
+        if disk is not None:
+            self._cached = disk
+        return self._cached
+
+    @contextmanager
+    def _refresh_lock(self) -> Iterator[None]:
+        """Serialize refreshes so the single-use, rotating refresh token is not
+        spent twice. The in-process mutex covers threads; an exclusive file lock
+        covers other processes sharing the store. The file lock is skipped where
+        fcntl is unavailable (Windows), leaving the in-process guard."""
+        with self._refresh_mutex:
+            if fcntl is None:
+                yield
+                return
+            lock_path = self._path.with_name(self._path.name + ".lock")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(
+                str(lock_path),
+                os.O_CREAT | os.O_RDWR,
+                stat.S_IRUSR | stat.S_IWUSR,
+            )
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                yield
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+                os.close(fd)
+
     def get_access_token(
         self,
         client_id: str,
         client_secret: SecretStr,
         token_url: str,
     ) -> str:
-        if self._cached is None:
-            self._cached = self.load()
-        if self._cached is None:
+        token = self._reload()
+        if token is None:
             raise TokenExpiredError(
                 "No OAuth tokens found. Run `mcp-workboard-crunchtools login` first."
             )
-
-        if time.time() < self._cached.expires_at - REFRESH_MARGIN_SECONDS:
-            return self._cached.access_token.get_secret_value()
-
-        if self._cached.refresh_token is None:
+        if self._is_valid(token):
+            return token.access_token.get_secret_value()
+        if token.refresh_token is None:
             raise TokenExpiredError(
                 "Access token expired and no refresh token available. "
                 "Run `mcp-workboard-crunchtools login` again."
             )
 
         logger.info("Access token expired, refreshing...")
-        try:
-            with httpx.Client(timeout=30.0, verify=True) as http:
-                response = http.post(
-                    token_url,
-                    data={
-                        "grant_type": "refresh_token",
-                        "refresh_token": self._cached.refresh_token.get_secret_value(),
-                        "client_id": client_id,
-                        "client_hash": client_secret.get_secret_value(),
-                    },
+        with self._refresh_lock():
+            # Re-read under the lock: another instance may have refreshed while
+            # we waited, in which case we use its token instead of spending ours.
+            token = self._reload()
+            if token is None:
+                raise TokenExpiredError(
+                    "No OAuth tokens found. Run `mcp-workboard-crunchtools login` first."
                 )
-                response.raise_for_status()
-                token_response = response.json()
-        except (httpx.HTTPError, ValueError) as e:
-            raise TokenExpiredError(
-                f"Token refresh failed: {e}. Run `mcp-workboard-crunchtools login` again."
-            ) from e
+            if self._is_valid(token):
+                return token.access_token.get_secret_value()
+            if token.refresh_token is None:
+                raise TokenExpiredError(
+                    "Access token expired and no refresh token available. "
+                    "Run `mcp-workboard-crunchtools login` again."
+                )
 
-        new_data = _parse_token_response(token_response, self._cached.refresh_token)
-        self.save(new_data)
-        return new_data.access_token.get_secret_value()
+            try:
+                with httpx.Client(timeout=30.0, verify=True) as http:
+                    response = http.post(
+                        token_url,
+                        data={
+                            "grant_type": "refresh_token",
+                            "refresh_token": token.refresh_token.get_secret_value(),
+                            "client_id": client_id,
+                            "client_hash": client_secret.get_secret_value(),
+                        },
+                    )
+                    response.raise_for_status()
+                    token_response = response.json()
+            except (httpx.HTTPError, ValueError) as e:
+                raise TokenExpiredError(
+                    f"Token refresh failed: {e}. Run `mcp-workboard-crunchtools login` again."
+                ) from e
+
+            new_data = _parse_token_response(token_response, token.refresh_token)
+            self.save(new_data)
+            return new_data.access_token.get_secret_value()
 
 
 def _parse_token_response(
