@@ -8,6 +8,30 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-10
+
+### Added
+- The thirteen tools that only read publish `readOnlyHint: true`:
+  `get_user`, `list_users`, `get_teams`, `get_team_members`, `get_objectives`,
+  `get_objective_details`, `get_my_key_results`, `get_user_key_results`,
+  `get_workstreams`, `get_workstream_activities`, `get_team_workstreams`,
+  `list_activities` and `get_activity`. A gateway uses the hint to decide
+  whether an invalid optional argument may be dropped or must refuse the call
+  (crunchtools/constitution#35).
+- Tests pin every registered tool into `READ_ONLY` or `WRITES`, and call each
+  read-only tool through the registry to check it sends WorkBoard nothing but
+  GET requests.
+
+### Changed
+- `workboard_get_my_objectives_tool` stays unannotated. It issues only GETs,
+  but one per objective ID, and nothing caps how many IDs a caller passes.
+- Inherits constitution v1.22.0; the workflow pins and the pre-commit hook rev
+  move with it.
+
+### Fixed
+- `FastMCP(version=)` and `uv.lock` said 0.10.0 through the 0.10.1 release; they carry the
+  release version again.
+
 ## [0.10.1] - 2026-10-09
 
 Live API testing (via the MCP server against the production endpoint) found that
