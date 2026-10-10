@@ -58,6 +58,107 @@ class TestToolRegistration:
         assert "goal_type" not in props
 
 
+READ_ONLY = frozenset(
+    {
+        "workboard_get_user_tool",
+        "workboard_list_users_tool",
+        "workboard_get_teams_tool",
+        "workboard_get_team_members_tool",
+        "workboard_get_objectives_tool",
+        "workboard_get_objective_details_tool",
+        "workboard_get_my_key_results_tool",
+        "workboard_get_user_key_results_tool",
+        "workboard_get_workstreams_tool",
+        "workboard_get_workstream_activities_tool",
+        "workboard_get_team_workstreams_tool",
+        "workboard_list_activities_tool",
+        "workboard_get_activity_tool",
+    }
+)
+# Everything that does not publish the hint. workboard_get_my_objectives_tool
+# changes nothing, but it sends one GET per objective ID and the caller sets how
+# many, so one call is not bounded by the cost of an ordinary request.
+WRITES = frozenset(
+    {
+        "workboard_create_user_tool",
+        "workboard_update_user_tool",
+        "workboard_get_my_objectives_tool",
+        "workboard_update_key_result_tool",
+        "workboard_create_objective_tool",
+        "workboard_create_workstream_tool",
+        "workboard_update_workstream_tool",
+        "workboard_create_activity_tool",
+        "workboard_update_activity_tool",
+    }
+)
+
+# Arguments that satisfy each read-only tool's required parameters.
+READ_ONLY_CALLS: dict[str, dict[str, object]] = {
+    "workboard_get_user_tool": {"user_id": 7},
+    "workboard_list_users_tool": {},
+    "workboard_get_teams_tool": {},
+    "workboard_get_team_members_tool": {"team_id": 3},
+    "workboard_get_objectives_tool": {"user_id": 7},
+    "workboard_get_objective_details_tool": {"user_id": 7, "objective_id": 5},
+    "workboard_get_my_key_results_tool": {"include_prior_years": True},
+    "workboard_get_user_key_results_tool": {"user_id": 7, "include_prior_years": True},
+    "workboard_get_workstreams_tool": {"ws_id": 9},
+    "workboard_get_workstream_activities_tool": {"ws_id": 9},
+    "workboard_get_team_workstreams_tool": {"team_id": 3},
+    "workboard_list_activities_tool": {"ai_state": "doing", "limit": 5, "offset": 0},
+    "workboard_get_activity_tool": {"activity_id": 11},
+}
+
+
+class TestReadOnlyAnnotation:
+    """Every registered tool is classified, and the reads really only read."""
+
+    @pytest.mark.asyncio
+    async def test_every_tool_is_classified(self) -> None:
+        from mcp_workboard_crunchtools.server import mcp
+
+        tools = await mcp.list_tools()
+        assert READ_ONLY.isdisjoint(WRITES)
+        assert {tool.name for tool in tools} == READ_ONLY | WRITES
+        annotated = {
+            tool.name
+            for tool in tools
+            if tool.annotations is not None
+            and tool.annotations.model_dump(by_alias=True).get("readOnlyHint") is True
+        }
+        assert annotated == READ_ONLY
+
+    def test_every_read_only_tool_has_call_arguments(self) -> None:
+        assert set(READ_ONLY_CALLS) == READ_ONLY
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("name", sorted(READ_ONLY))
+    async def test_read_only_tool_sends_only_get(self, name: str) -> None:
+        """A read-only tool reaches WorkBoard with GET or HEAD and nothing else."""
+        from mcp_workboard_crunchtools.server import mcp
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "user": {"user_id": "7", "goal": {"goal_id": "5"}},
+                    "goal": [{"goal_id": "5", "goal_name": "Ship"}],
+                    "metric": [{"metric_id": "21", "metric_name": "KR"}],
+                    "team": {"team_name": "Platform"},
+                    "workstream": [{"ws_id": "9"}],
+                    "activity": [{"ai_id": "11"}],
+                }
+            }
+        )
+
+        with _patch_client(resp) as client_cls:
+            await mcp.call_tool(name, READ_ONLY_CALLS[name])
+
+        requests = client_cls.return_value.request.await_args_list
+        assert len(requests) >= 1
+        assert {call.kwargs["method"] for call in requests} <= {"GET", "HEAD"}
+
+
 class TestErrorSafety:
     """Tests to verify error messages don't leak sensitive data."""
 

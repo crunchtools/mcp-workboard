@@ -33,9 +33,13 @@ from .tools import (
 
 logger = logging.getLogger(__name__)
 
+# A gateway drops an invalid optional argument only on a tool annotated read-only;
+# on anything else it refuses the call. Only tools that change nothing get this.
+READ_ONLY = {"readOnlyHint": True}
+
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.10.0",
+    version="0.11.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -65,7 +69,7 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_user_tool(
     user_id: int | None = None,
 ) -> dict[str, Any]:
@@ -81,7 +85,7 @@ async def workboard_get_user_tool(
     return await get_user(user_id=user_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_list_users_tool() -> dict[str, Any]:
     """List all WorkBoard users (requires Data-Admin role).
 
@@ -146,7 +150,7 @@ async def workboard_update_user_tool(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_teams_tool() -> dict[str, Any]:
     """Get all teams the authenticated user belongs to.
 
@@ -159,7 +163,7 @@ async def workboard_get_teams_tool() -> dict[str, Any]:
     return await get_teams()
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
     """Get all members of a WorkBoard team, including their user IDs and emails.
 
@@ -175,7 +179,7 @@ async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
     return await get_team_members(team_id=team_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_objectives_tool(
     user_id: int,
 ) -> dict[str, Any]:
@@ -196,7 +200,7 @@ async def workboard_get_objectives_tool(
     return await get_objectives(user_id=user_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_objective_details_tool(
     user_id: int,
     objective_id: int,
@@ -239,7 +243,7 @@ async def workboard_get_my_objectives_tool(
     return await get_my_objectives(objective_ids=objective_ids)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_my_key_results_tool(
     include_prior_years: bool = False,
 ) -> dict[str, Any]:
@@ -262,7 +266,7 @@ async def workboard_get_my_key_results_tool(
     return await get_my_key_results(include_prior_years=include_prior_years)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_user_key_results_tool(
     user_id: int,
     include_prior_years: bool = False,
@@ -373,7 +377,7 @@ async def workboard_create_objective_tool(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_workstreams_tool(
     ws_id: int | None = None,
 ) -> dict[str, Any]:
@@ -391,7 +395,7 @@ async def workboard_get_workstreams_tool(
     return await get_workstreams(ws_id=ws_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_workstream_activities_tool(
     ws_id: int,
 ) -> dict[str, Any]:
@@ -409,7 +413,7 @@ async def workboard_get_workstream_activities_tool(
     return await get_workstream_activities(ws_id=ws_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_team_workstreams_tool(
     team_id: int,
 ) -> dict[str, Any]:
@@ -494,7 +498,7 @@ async def workboard_update_workstream_tool(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_list_activities_tool(
     ai_owner: str | None = None,
     ai_state: str | None = None,
@@ -529,7 +533,7 @@ async def workboard_list_activities_tool(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_activity_tool(
     activity_id: int,
 ) -> dict[str, Any]:
