@@ -3,7 +3,7 @@
 Tools for getting, listing, creating, and updating WorkBoard users.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from ..client import get_client
 from ..models import CreateUserInput, UpdateUserInput, validate_user_id
@@ -33,28 +33,41 @@ async def get_user(
 
 
 async def list_users(
+    scope: Literal["team", "org"] = "team",
     limit: int = 100,
     offset: int | None = None,
 ) -> dict[str, Any]:
-    """List all WorkBoard users (requires Data-Admin role).
+    """List WorkBoard users.
 
-    Bare GET /user returns only the caller; include=org_members is what
-    returns the organization's users, and it needs a Data-Admin token.
+    Bare GET /user returns only the caller. include=team_members returns the
+    members of teams the caller can see and works for any token;
+    include=org_members returns the whole organization but needs a
+    Data-Admin token (WorkBoard answers 400 otherwise).
 
     Args:
+        scope: "team" for members of the caller's teams, "org" for every user
+               in the organization (Data-Admin only)
         limit: Maximum number of users to return (default 100)
         offset: Number of users to skip (optional)
 
     Returns:
-        Dictionary containing list of all users
+        Dictionary containing list of users
     """
     client = get_client()
 
-    params: dict[str, Any] = {"include": "org_members", "limit": limit}
-    if offset is not None:
-        params["offset"] = offset
+    if scope == "org":
+        params: dict[str, Any] = {"include": "org_members", "limit": limit}
+        if offset is not None:
+            params["offset"] = offset
+        response = await client.get("/user", params=params)
+        return {"users": response}
 
-    response = await client.get("/user", params=params)
+    # team_members is not paginated by the API, so page it here.
+    response = await client.get("/user", params={"include": "team_members"})
+    team_listing = response.get("data")
+    if isinstance(team_listing, dict) and isinstance(team_listing.get("user"), list):
+        start = offset or 0
+        team_listing["user"] = team_listing["user"][start : start + limit]
 
     return {"users": response}
 

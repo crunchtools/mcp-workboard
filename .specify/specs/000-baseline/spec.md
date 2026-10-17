@@ -19,7 +19,7 @@ Baseline specification for mcp-workboard-crunchtools v0.7.0, documenting all 18 
 | Tool | Method | Endpoint | Description |
 |------|--------|----------|-------------|
 | `get_user` | GET | `/user` or `/user/{id}` | Get current user or specific user by ID |
-| `list_users` | GET | `/user?include=org_members` | List all users, paginated by `limit`/`offset` (Data-Admin required) |
+| `list_users` | GET | `/user?include=team_members` or `?include=org_members` | List team members (default) or all org users (Data-Admin required) |
 | `create_user` | POST | `/user` | Create a new user (Data-Admin required) |
 | `update_user` | PUT | `/user/{id}` | Update an existing user |
 

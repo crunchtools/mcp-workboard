@@ -365,34 +365,49 @@ class TestUserTools:
 
     @pytest.mark.asyncio
     async def test_list_users(self) -> None:
-        """list_users should return users list."""
+        """list_users defaults to team scope, which any token can read."""
         from mcp_workboard_crunchtools.tools import list_users
 
         resp = _mock_response(
             json_data={
-                "data": [
-                    {"user_id": "1", "first_name": "Alice"},
-                    {"user_id": "2", "first_name": "Bob"},
-                ],
+                "data": {
+                    "user": [
+                        {"user_id": "1", "first_name": "Alice"},
+                        {"user_id": "2", "first_name": "Bob"},
+                    ],
+                },
             }
         )
 
         with _patch_client(resp) as mock_cls:
             result = await list_users()
 
-        assert "users" in result
+        assert len(result["users"]["data"]["user"]) == 2
         params = mock_cls.return_value.request.call_args.kwargs["params"]
-        assert params == {"include": "org_members", "limit": 100}
+        assert params == {"include": "team_members"}
 
     @pytest.mark.asyncio
-    async def test_list_users_pagination(self) -> None:
-        """list_users should pass limit and offset alongside include=org_members."""
+    async def test_list_users_team_pages_locally(self) -> None:
+        """team scope is not paginated by the API, so limit/offset slice the result."""
+        from mcp_workboard_crunchtools.tools import list_users
+
+        users = [{"user_id": str(i)} for i in range(10)]
+        resp = _mock_response(json_data={"data": {"user": users}})
+
+        with _patch_client(resp):
+            result = await list_users(limit=3, offset=4)
+
+        assert [u["user_id"] for u in result["users"]["data"]["user"]] == ["4", "5", "6"]
+
+    @pytest.mark.asyncio
+    async def test_list_users_org_pagination(self) -> None:
+        """org scope sends include=org_members with limit and offset."""
         from mcp_workboard_crunchtools.tools import list_users
 
         resp = _mock_response(json_data={"data": []})
 
         with _patch_client(resp) as mock_cls:
-            await list_users(limit=50, offset=100)
+            await list_users(scope="org", limit=50, offset=100)
 
         params = mock_cls.return_value.request.call_args.kwargs["params"]
         assert params == {"include": "org_members", "limit": 50, "offset": 100}

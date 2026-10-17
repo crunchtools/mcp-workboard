@@ -15,6 +15,11 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
   It now sends `include=org_members` on `GET /user`, which the WorkBoard API
   requires to return all users (Data-Admin token). It pages with `limit`
   (default 100) and `offset` (#67).
+- **`workboard_list_users_tool` defaults to `scope="team"`.** WorkBoard
+  rejects `include=org_members` with a 400 unless the token is Data-Admin, so
+  the default now lists members of the caller's teams (`include=team_members`),
+  which any account can read. `scope="org"` keeps the whole-organization
+  listing for Data-Admin tokens.
 - **Integer ID parameters publish `ge=1`.** All `user_id`, `objective_id`,
   `team_id`, `metric_id`, `ws_id` and `activity_id` arguments (read and write
   tools) now reject `0` and negative values in the registered schema, as the

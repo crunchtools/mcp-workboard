@@ -1,7 +1,7 @@
 """FastMCP server setup for WorkBoard MCP."""
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
 from pydantic import Field
@@ -91,22 +91,26 @@ async def workboard_get_user_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_list_users_tool(
+    scope: Literal["team", "org"] = "team",
     limit: Annotated[int, Field(ge=1)] = 100,
     offset: Annotated[int, Field(ge=0)] | None = None,
 ) -> dict[str, Any]:
-    """List all users in the WorkBoard organization (requires Data-Admin role).
+    """List WorkBoard users.
 
-    Returns up to 100 users by default; use limit and offset to page. Without
-    a Data-Admin token the API returns only the authenticated user.
+    scope="team" (default) returns members of teams you can see and works for
+    any account. scope="org" returns every user in the organization and
+    requires a Data-Admin token. Returns up to 100 users; use limit and
+    offset to page.
 
     Args:
+        scope: "team" or "org" (org requires Data-Admin)
         limit: Maximum number of users to return (default 100)
         offset: Number of users to skip (optional)
 
     Returns:
-        List of all users
+        List of users
     """
-    return await list_users(limit=limit, offset=offset)
+    return await list_users(scope=scope, limit=limit, offset=offset)
 
 
 @mcp.tool()
