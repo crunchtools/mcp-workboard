@@ -1,6 +1,6 @@
 # Claude Code Instructions
 
-Secure MCP server for WorkBoard OKR and strategy execution platform. 22 tools across 5 categories.
+Secure MCP server for WorkBoard OKR and strategy execution platform. 25 tools across 6 categories.
 
 ## Quick Start
 
@@ -45,7 +45,9 @@ To get OAuth credentials: go to WorkBoard Admin > Custom Integrations > App tab,
 
 ### Remote Deployment
 
-For remote deployments where the MCP server runs in a container:
+For a container behind a reverse proxy, set `WORKBOARD_OAUTH_REDIRECT_URI` to the public URL of the server's `/callback` route (registered for the WorkBoard app), then call `workboard_auth_start_tool` and approve the URL it returns. `workboard_auth_status_tool` confirms; `workboard_auth_result_tool` reports the last redirect.
+
+Without a public callback:
 1. Run `mcp-workboard-crunchtools login` on your local machine
 2. Copy `~/.config/mcp-workboard/tokens.json` to the remote host
 3. Set `WORKBOARD_TOKEN_STORE_PATH` to point to the token file in the container
@@ -59,10 +61,11 @@ For remote deployments where the MCP server runs in a container:
 | `WORKBOARD_CLIENT_ID` | Auth* | — | OAuth 2 client ID |
 | `WORKBOARD_CLIENT_SECRET` | Auth* | — | OAuth 2 client secret |
 | `WORKBOARD_TOKEN_STORE_PATH` | No | `~/.config/mcp-workboard/tokens.json` | Override token storage location |
+| `WORKBOARD_OAUTH_REDIRECT_URI` | No | — | Public `/callback` URL for `workboard_auth_start_tool` (CLI `login` ignores it) |
 
 \* One auth method required: either `WORKBOARD_API_TOKEN`/`WORKBOARD_API_TOKEN_FILE` (static), or `WORKBOARD_CLIENT_ID` + `WORKBOARD_CLIENT_SECRET` (OAuth).
 
-## Available Tools (22)
+## Available Tools (25)
 
 | Category | Tools | Operations |
 |----------|------:|------------|
@@ -72,6 +75,7 @@ For remote deployments where the MCP server runs in a container:
 | Key Results | 3 | get mine, get by user, update |
 | Workstreams | 5 | get, get activities, get by team, create, update |
 | Activities | 4 | list, get, create, update |
+| Authorization | 3 | status, start, result |
 
 Full tool inventory with API endpoints: `.specify/specs/000-baseline/spec.md`
 

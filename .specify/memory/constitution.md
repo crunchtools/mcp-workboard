@@ -1,8 +1,8 @@
 # mcp-workboard-crunchtools Constitution
 
-> **Version:** 1.3.0
+> **Version:** 1.4.0
 > **Ratified:** 2026-03-10
-> **Amended:** 2026-10-02
+> **Amended:** 2026-10-17
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.24.0
 > **Profile:** MCP Server
@@ -19,8 +19,14 @@ are not restated here.
   `WORKBOARD_API_TOKEN_FILE`), or OAuth 2 with `WORKBOARD_CLIENT_ID` and
   `WORKBOARD_CLIENT_SECRET`. All are `SecretStr`, never logged, never shown by
   `Config` `repr()`/`str()`, and scrubbed from `WorkBoardApiError` messages.
-- **OAuth flow:** authorization code with PKCE. The login callback listens on
-  `127.0.0.1:8963` only. Tokens persist at `WORKBOARD_TOKEN_STORE_PATH`
+- **OAuth flow:** authorization code with a single-use CSRF `state`; no PKCE
+  is sent (the flow never sent one). Two callbacks complete it. The CLI
+  `login` listens on `127.0.0.1:8963` only. A running server also serves
+  `GET /callback` on its HTTP transport for `workboard_auth_start_tool`, so a
+  container behind a reverse proxy can be re-authorized at the public URL in
+  `WORKBOARD_OAUTH_REDIRECT_URI`. That route acts only on a `state` this server
+  issued in the last 10 minutes, bounds its query parameters, and its page
+  escapes its output and never shows a code or token. Tokens persist at `WORKBOARD_TOKEN_STORE_PATH`
   (default `~/.config/mcp-workboard/tokens.json`), written with mode 0600, and
   are refreshed 60s before expiry.
 - **Input limits:** ID validators reject non-positive integers; dates are
@@ -48,7 +54,7 @@ configurable, to prevent SSRF.
 | Container image | `quay.io/crunchtools/mcp-workboard`, `ghcr.io/crunchtools/mcp-workboard` |
 | systemd service | `mcp-workboard.service` |
 | HTTP port | 8007 |
-| OAuth callback port | 8963 (loopback, login flow only) |
+| OAuth callback | CLI `login`: `127.0.0.1:8963`; server: `/callback` on the HTTP port, public URL in `WORKBOARD_OAUTH_REDIRECT_URI` |
 
 ## History
 
@@ -58,3 +64,4 @@ configurable, to prevent SSRF.
 | 1.1.0 | 2026-03-10 | Adopt org constitution v1.2.0: mandatory GitHub Release, release workflow |
 | 1.2.0 | 2026-03-10 | Full compliance with org v1.2.0 and MCP Server profile v1.0.0 |
 | 1.3.0 | 2026-10-02 | Manifest under constitution v1.18.0: profile restatement removed, mcp-workboard specifics kept |
+| 1.4.0 | 2026-10-17 | Server-side OAuth callback for containerized re-authorization; PKCE claim corrected to match the flow |
