@@ -382,7 +382,7 @@ class TestUserTools:
 
         assert "users" in result
         params = mock_cls.return_value.request.call_args.kwargs["params"]
-        assert params == {"include": "org_members"}
+        assert params == {"include": "org_members", "limit": 100}
 
     @pytest.mark.asyncio
     async def test_list_users_pagination(self) -> None:

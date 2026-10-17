@@ -91,16 +91,16 @@ async def workboard_get_user_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_list_users_tool(
-    limit: Annotated[int, Field(ge=1)] | None = None,
+    limit: Annotated[int, Field(ge=1)] = 100,
     offset: Annotated[int, Field(ge=0)] | None = None,
 ) -> dict[str, Any]:
     """List all users in the WorkBoard organization (requires Data-Admin role).
 
-    Use limit and offset for pagination. Without a Data-Admin token the API
-    returns only the authenticated user.
+    Returns up to 100 users by default; use limit and offset to page. Without
+    a Data-Admin token the API returns only the authenticated user.
 
     Args:
-        limit: Maximum number of users to return (optional)
+        limit: Maximum number of users to return (default 100)
         offset: Number of users to skip (optional)
 
     Returns:

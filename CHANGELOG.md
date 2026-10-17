@@ -11,8 +11,8 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 ### Fixed
 - **`workboard_list_users_tool` lists the organization, not just the caller.**
   It now sends `include=org_members` on `GET /user`, which the WorkBoard API
-  requires to return all users (Data-Admin token), and accepts `limit` and
-  `offset` for pagination (#67).
+  requires to return all users (Data-Admin token). It pages with `limit`
+  (default 100) and `offset` (#67).
 - **Integer ID parameters publish `ge=1`.** All `user_id`, `objective_id`,
   `team_id`, `metric_id`, `ws_id` and `activity_id` arguments (read and write
   tools) now reject `0` and negative values in the registered schema, as the

@@ -33,7 +33,7 @@ async def get_user(
 
 
 async def list_users(
-    limit: int | None = None,
+    limit: int = 100,
     offset: int | None = None,
 ) -> dict[str, Any]:
     """List all WorkBoard users (requires Data-Admin role).
@@ -42,7 +42,7 @@ async def list_users(
     returns the organization's users, and it needs a Data-Admin token.
 
     Args:
-        limit: Maximum number of users to return (optional)
+        limit: Maximum number of users to return (default 100)
         offset: Number of users to skip (optional)
 
     Returns:
@@ -50,9 +50,7 @@ async def list_users(
     """
     client = get_client()
 
-    params: dict[str, Any] = {"include": "org_members"}
-    if limit is not None:
-        params["limit"] = limit
+    params: dict[str, Any] = {"include": "org_members", "limit": limit}
     if offset is not None:
         params["offset"] = offset
 
