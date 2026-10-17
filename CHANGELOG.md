@@ -8,6 +8,8 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-17
+
 ### Fixed
 - **Integer ID parameters publish `ge=1`.** All `user_id`, `objective_id`,
   `team_id`, `metric_id`, `ws_id` and `activity_id` arguments (read and write
