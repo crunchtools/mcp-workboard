@@ -38,6 +38,9 @@ class Config:
         Raises:
             ConfigurationError: If required environment variables are missing.
         """
+        from .auth import REDIRECT_URI_VAR
+
+        self._oauth_redirect_uri = os.environ.get(REDIRECT_URI_VAR, "").strip() or None
         token = self._load_static_token()
         if token:
             self._auth_mode = AuthMode.STATIC_TOKEN
@@ -65,7 +68,8 @@ class Config:
             "Authentication required. Choose one:\n"
             "  Static token: set WORKBOARD_API_TOKEN or WORKBOARD_API_TOKEN_FILE\n"
             "  OAuth 2: set WORKBOARD_CLIENT_ID + WORKBOARD_CLIENT_SECRET, "
-            "then run `mcp-workboard-crunchtools login`"
+            "then run `mcp-workboard-crunchtools login` or, with "
+            "WORKBOARD_OAUTH_REDIRECT_URI set, call the workboard_auth_start_tool"
         )
 
     @staticmethod
@@ -83,6 +87,32 @@ class Config:
     @property
     def auth_mode(self) -> AuthMode:
         return self._auth_mode
+
+    @property
+    def client_id(self) -> str | None:
+        """Return the OAuth client ID, or None in static token mode."""
+        return self._client_id
+
+    @property
+    def client_secret(self) -> SecretStr | None:
+        """Return the OAuth client secret, or None in static token mode."""
+        return self._client_secret
+
+    @property
+    def token_store(self) -> TokenStore | None:
+        """Return the OAuth token store, or None in static token mode."""
+        return self._token_store
+
+    @property
+    def oauth_redirect_uri(self) -> str | None:
+        """Return the public URL WorkBoard should redirect to after approval.
+
+        Unset means browser authorization from the server is unavailable: a
+        container has no localhost the user's browser can reach, so there is
+        nowhere for WorkBoard to send them. The CLI `login` does not read this;
+        it always listens on localhost. Read once, when Config is built.
+        """
+        return self._oauth_redirect_uri
 
     @property
     def token(self) -> str:

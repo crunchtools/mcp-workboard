@@ -4,9 +4,10 @@ import argparse
 import os
 import sys
 
-from .server import mcp
+# Imported through routes so the /callback route is registered on the instance.
+from .routes import mcp
 
-__version__ = "0.11.2"
+__version__ = "0.12.0"
 __all__ = ["main", "mcp"]
 
 

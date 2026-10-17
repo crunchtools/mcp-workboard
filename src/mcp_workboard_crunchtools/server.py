@@ -8,6 +8,9 @@ from pydantic import Field
 
 from .models import KeyResultInput
 from .tools import (
+    auth_result,
+    auth_start,
+    auth_status,
     create_activity,
     create_objective,
     create_user,
@@ -43,7 +46,7 @@ PositiveId = Annotated[int, Field(ge=1)]
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.11.2",
+    version="0.12.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -68,9 +71,42 @@ mcp = FastMCP(
         "filters, workboard_get_activity_tool to get a single action item by ID, "
         "workboard_create_activity_tool to create a new action item, and "
         "workboard_update_activity_tool to update an existing action item's state, priority, "
-        "effort, due date, or owner."
+        "effort, due date, or owner.\n\n"
+        "AUTHORIZATION: If a call fails because the OAuth token is missing or "
+        "expired, call workboard_auth_status_tool, then workboard_auth_start_tool "
+        "and hand the user the URL it returns. Confirm with workboard_auth_status_tool "
+        "or workboard_auth_result_tool."
     ),
 )
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def workboard_auth_status_tool() -> str:
+    """Report whether this server currently holds a usable WorkBoard credential.
+
+    Call this first. It says which auth mode is active, where tokens are
+    stored, whether one exists, and verifies it with GET /user. If it is not
+    usable, it says which tool fixes it.
+    """
+    return await auth_status()
+
+
+@mcp.tool()
+async def workboard_auth_start_tool() -> str:
+    """Begin browser authorization and return the URL for the user to approve.
+
+    Open the returned URL. The user approves there, WorkBoard redirects back
+    to this server, and the tokens are stored automatically -- nothing is
+    copied back by hand. Then call workboard_auth_status_tool to confirm.
+    Requires OAuth mode and WORKBOARD_OAUTH_REDIRECT_URI.
+    """
+    return await auth_start()
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def workboard_auth_result_tool() -> str:
+    """Report the outcome of the most recent authorization redirect."""
+    return await auth_result()
 
 
 @mcp.tool(annotations=READ_ONLY)

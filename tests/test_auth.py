@@ -180,6 +180,44 @@ class TestTokenStore:
         assert reloaded is not None
         assert reloaded.access_token.get_secret_value() == "new-token"
 
+    def test_get_access_token_oversized_refresh_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import mcp_workboard_crunchtools.auth as auth_mod
+
+        store = TokenStore(path=tmp_path / "tokens.json")
+        store.save(
+            TokenData(
+                access_token=SecretStr("old-token"),
+                refresh_token=SecretStr("refresh-token"),
+                expires_at=time.time() - 100,
+            )
+        )
+        monkeypatch.setattr(auth_mod, "MAX_RESPONSE_SIZE", 10)
+        oversized = httpx.Response(
+            status_code=200,
+            json={"access_token": "new-token", "expires_in": 3600},
+            request=httpx.Request("POST", FAKE_TOKEN_URL),
+        )
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.post.return_value = oversized
+
+        with (
+            patch("mcp_workboard_crunchtools.auth.httpx.Client", return_value=mock_client),
+            pytest.raises(TokenExpiredError, match="too large"),
+        ):
+            store.get_access_token(
+                client_id="cid",
+                client_secret=SecretStr("csecret"),
+                token_url=FAKE_TOKEN_URL,
+            )
+
+        reloaded = store.load()
+        assert reloaded is not None
+        assert reloaded.access_token.get_secret_value() == "old-token"
+
     def test_get_access_token_reloads_external_update(self, tmp_path: Path) -> None:
         path = tmp_path / "tokens.json"
         store = TokenStore(path=path)

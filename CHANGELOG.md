@@ -8,6 +8,33 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-17
+
+### Added
+- **Server-side OAuth re-authorization.** A server running in a container
+  behind a reverse proxy can now be re-authorized with a tool call instead of
+  running `login` on a workstation and copying `tokens.json` over. Set
+  `WORKBOARD_OAUTH_REDIRECT_URI` to the public HTTPS URL of the server's new
+  `/callback` route (and register that URL for the WorkBoard app), then:
+  - `workboard_auth_status_tool` reports the auth mode, the token store path,
+    whether a token exists, and verifies it with `GET /user`, showing the
+    account email.
+  - `workboard_auth_start_tool` returns the WorkBoard authorize URL. The user
+    approves in a browser, WorkBoard redirects to `/callback`, and the server
+    exchanges the code and saves the tokens. The CSRF state is held
+    server-side, single-use, and expires after 10 minutes.
+  - `workboard_auth_result_tool` reports what happened to the most recent
+    redirect.
+  The callback page never echoes a credential or the authorization code, and
+  escapes WorkBoard's `error` parameter. The CLI `login` is unchanged and still
+  listens on `http://localhost:8963/callback`.
+
+### Changed
+- Token-refresh failure messages now name `workboard_auth_start_tool` alongside
+  `mcp-workboard-crunchtools login`.
+- A failed token exchange no longer includes WorkBoard's response body in the
+  error message.
+
 ## [0.11.2] - 2026-10-17
 
 ### Fixed

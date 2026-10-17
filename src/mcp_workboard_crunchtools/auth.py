@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover - Windows has no fcntl
 import httpx
 from pydantic import BaseModel, SecretStr
 
+from .client import MAX_RESPONSE_SIZE
 from .errors import AuthenticationError, TokenExpiredError
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,13 @@ logger = logging.getLogger(__name__)
 REFRESH_MARGIN_SECONDS = 60
 DEFAULT_TOKEN_STORE_PATH = Path.home() / ".config" / "mcp-workboard" / "tokens.json"
 DEFAULT_CALLBACK_PORT = 8963
+REDIRECT_URI_VAR = "WORKBOARD_OAUTH_REDIRECT_URI"
+PENDING_LOGIN_TTL_SECONDS = 600
+HTTP_TIMEOUT = 30.0
+
+# Every message that ends in "authorize again" names both ways to do it: the CLI
+# on a workstation, or the tool on a server that has a public callback.
+REAUTH_HINT = "Run `mcp-workboard-crunchtools login` or call the workboard_auth_start_tool."
 
 OAUTH_AUTHORIZE_URL = "https://www.myworkboard.com/wb/oauth/authorize"
 OAUTH_TOKEN_URL = "https://www.myworkboard.com/wb/oauth/token"
@@ -154,15 +162,12 @@ class TokenStore:
     ) -> str:
         token = self._reload()
         if token is None:
-            raise TokenExpiredError(
-                "No OAuth tokens found. Run `mcp-workboard-crunchtools login` first."
-            )
+            raise TokenExpiredError(f"No OAuth tokens found. {REAUTH_HINT}")
         if self._is_valid(token):
             return token.access_token.get_secret_value()
         if token.refresh_token is None:
             raise TokenExpiredError(
-                "Access token expired and no refresh token available. "
-                "Run `mcp-workboard-crunchtools login` again."
+                f"Access token expired and no refresh token available. {REAUTH_HINT}"
             )
 
         logger.info("Access token expired, refreshing...")
@@ -171,19 +176,16 @@ class TokenStore:
             # we waited, in which case we use its token instead of spending ours.
             token = self._reload()
             if token is None:
-                raise TokenExpiredError(
-                    "No OAuth tokens found. Run `mcp-workboard-crunchtools login` first."
-                )
+                raise TokenExpiredError(f"No OAuth tokens found. {REAUTH_HINT}")
             if self._is_valid(token):
                 return token.access_token.get_secret_value()
             if token.refresh_token is None:
                 raise TokenExpiredError(
-                    "Access token expired and no refresh token available. "
-                    "Run `mcp-workboard-crunchtools login` again."
+                    f"Access token expired and no refresh token available. {REAUTH_HINT}"
                 )
 
             try:
-                with httpx.Client(timeout=30.0, verify=True) as http:
+                with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
                     response = http.post(
                         token_url,
                         data={
@@ -194,11 +196,11 @@ class TokenStore:
                         },
                     )
                     response.raise_for_status()
+                    if len(response.content) > MAX_RESPONSE_SIZE:
+                        raise TokenExpiredError(f"Token refresh response too large. {REAUTH_HINT}")
                     token_response = response.json()
             except (httpx.HTTPError, ValueError) as e:
-                raise TokenExpiredError(
-                    f"Token refresh failed: {e}. Run `mcp-workboard-crunchtools login` again."
-                ) from e
+                raise TokenExpiredError(f"Token refresh failed: {e}. {REAUTH_HINT}") from e
 
             new_data = _parse_token_response(token_response, token.refresh_token)
             self.save(new_data)
@@ -269,6 +271,65 @@ class _CallbackServer(HTTPServer):
     callback_error: str | None = None
 
 
+def build_authorize_url(client_id: str, state: str, redirect_uri: str) -> str:
+    """Build the WorkBoard authorize URL.
+
+    WorkBoard needs the redirect URI on the authorize request and again on the
+    token exchange, and the two must match the one registered for the app.
+    """
+    params = urlencode(
+        {
+            "client_id": client_id,
+            "response_type": "code",
+            "redirect_uri": redirect_uri,
+            "scope": "all",
+            "state": state,
+        }
+    )
+    return f"{OAUTH_AUTHORIZE_URL}?{params}"
+
+
+def _exchange_code(
+    client_id: str,
+    client_secret: SecretStr,
+    code: str,
+    redirect_uri: str,
+    state: str,
+) -> TokenData:
+    """Trade an authorization code for a token set.
+
+    WorkBoard calls the client secret ``client_hash`` and wants the state echoed
+    back. The secret travels in the POST body, never in the URL. The response
+    body is left out of the error: it is shown to whoever is on the other end
+    of the redirect, and nothing in it is needed to diagnose a failed exchange.
+    """
+    try:
+        with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
+            response = http.post(
+                OAUTH_TOKEN_URL,
+                data={
+                    "client_id": client_id,
+                    "client_hash": client_secret.get_secret_value(),
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                    "state": state,
+                },
+            )
+            response.raise_for_status()
+            if len(response.content) > MAX_RESPONSE_SIZE:
+                raise AuthenticationError("Token exchange response too large")
+            token_response = response.json()
+    except httpx.HTTPStatusError as e:
+        raise AuthenticationError(
+            f"Token exchange failed with HTTP {e.response.status_code}"
+        ) from e
+    except (httpx.HTTPError, ValueError) as e:
+        raise AuthenticationError(f"Token exchange failed: {e}") from e
+    if not isinstance(token_response, dict):
+        raise AuthenticationError("Token exchange returned an unexpected response")
+    return _parse_token_response(token_response)
+
+
 def run_login_flow(
     client_id: str,
     client_secret: SecretStr,
@@ -279,17 +340,7 @@ def run_login_flow(
     redirect_uri = f"http://localhost:{callback_port}/callback"
 
     state = secrets.token_urlsafe(32)
-
-    params = urlencode(
-        {
-            "client_id": client_id,
-            "response_type": "code",
-            "redirect_uri": redirect_uri,
-            "scope": "all",
-            "state": state,
-        }
-    )
-    auth_url = f"{OAUTH_AUTHORIZE_URL}?{params}"
+    auth_url = build_authorize_url(client_id, state, redirect_uri)
 
     server = _CallbackServer(("127.0.0.1", callback_port), _CallbackHandler)
 
@@ -310,27 +361,107 @@ def run_login_flow(
         raise AuthenticationError("State parameter mismatch — possible CSRF attack")
 
     print("Exchanging authorization code for tokens...")
-    try:
-        with httpx.Client(timeout=30.0, verify=True) as http:
-            response = http.post(
-                OAUTH_TOKEN_URL,
-                data={
-                    "client_id": client_id,
-                    "client_hash": client_secret.get_secret_value(),
-                    "code": server.callback_code,
-                    "redirect_uri": redirect_uri,
-                    "state": state,
-                },
-            )
-            response.raise_for_status()
-            token_response = response.json()
-    except httpx.HTTPStatusError as e:
-        raise AuthenticationError(
-            f"Token exchange failed (HTTP {e.response.status_code}): {e.response.text}"
-        ) from e
-    except (httpx.HTTPError, ValueError) as e:
-        raise AuthenticationError(f"Token exchange failed: {e}") from e
-
-    token_data = _parse_token_response(token_response)
+    token_data = _exchange_code(client_id, client_secret, server.callback_code, redirect_uri, state)
     token_store.save(token_data)
     print(f"Login successful! Tokens saved to {token_store.path}")
+
+
+class PendingLogin:
+    """The one-shot state for an in-flight browser authorization.
+
+    The MCP tool that hands out the authorize URL and the HTTP route that
+    receives WorkBoard's redirect run in the same process but not in the same
+    call, so the CSRF state has to outlive the tool call. It is deliberately
+    single-slot: a second `auth_start` supersedes the first rather than
+    leaving two valid states outstanding. The lock matters because the
+    callback finishes its exchange on a worker thread.
+    """
+
+    def __init__(self) -> None:
+        """Start with no authorization in flight."""
+        self._state: str | None = None
+        self._issued_at: float = 0.0
+        self._outcome: str | None = None
+        self._mutex = Lock()
+
+    def issue(self) -> str:
+        """Mint and remember a fresh CSRF state, discarding any previous one."""
+        with self._mutex:
+            self._state = secrets.token_urlsafe(32)
+            self._issued_at = time.monotonic()
+            self._outcome = None
+            return self._state
+
+    def verify(self, state: str | None) -> None:
+        """Check a redirect's state against the outstanding one and consume it.
+
+        Raises:
+            AuthenticationError: If nothing is in flight, the window has
+                closed, or the value does not match.
+        """
+        with self._mutex:
+            if self._state is None:
+                raise AuthenticationError("No authorization is in progress")
+            if time.monotonic() - self._issued_at > PENDING_LOGIN_TTL_SECONDS:
+                self._state = None
+                raise AuthenticationError("Authorization expired; start it again")
+            if not secrets.compare_digest(state or "", self._state):
+                raise AuthenticationError("State parameter mismatch — possible CSRF")
+            self._state = None
+
+    @property
+    def in_progress(self) -> bool:
+        """Return whether a state has been issued and not yet consumed."""
+        return self._state is not None
+
+    @property
+    def outcome(self) -> str | None:
+        """Return the outcome of the last completed redirect, if any."""
+        return self._outcome
+
+    def record(self, message: str) -> None:
+        """Record the outcome so a follow-up tool call can report it."""
+        self._outcome = message
+
+
+_pending = PendingLogin()
+
+
+def get_pending_login() -> PendingLogin:
+    """Return the process-wide pending-login slot."""
+    return _pending
+
+
+def complete_login(
+    client_id: str,
+    client_secret: SecretStr,
+    token_store: TokenStore,
+    *,
+    code: str,
+    state: str,
+    redirect_uri: str,
+) -> TokenData:
+    """Finish a browser authorization from the redirect's parameters.
+
+    The caller verifies ``state`` first (see ``PendingLogin.verify``); this
+    only performs the exchange and stores the tokens.
+
+    Args:
+        client_id: The WorkBoard app's OAuth client ID.
+        client_secret: The app's client secret, sent as ``client_hash``.
+        token_store: Where the resulting tokens are saved.
+        code: The authorization code from the redirect.
+        state: The verified CSRF state, which WorkBoard wants echoed back.
+        redirect_uri: The redirect URI used on the authorize request; it must
+            match exactly.
+
+    Returns:
+        The token set that was saved to ``token_store``.
+
+    Raises:
+        AuthenticationError: If WorkBoard rejects the authorization code.
+    """
+    token_data = _exchange_code(client_id, client_secret, code, redirect_uri, state)
+    token_store.save(token_data)
+    logger.info("Tokens stored from browser authorization")
+    return token_data

@@ -9,6 +9,7 @@ from .activities import (
     list_activities,
     update_activity,
 )
+from .auth import auth_result, auth_start, auth_status, finish_callback
 from .objectives import (
     create_objective,
     get_my_key_results,
@@ -29,6 +30,10 @@ from .workstreams import (
 )
 
 __all__ = [
+    "auth_status",
+    "auth_start",
+    "auth_result",
+    "finish_callback",
     "list_activities",
     "get_activity",
     "create_activity",

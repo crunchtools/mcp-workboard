@@ -23,10 +23,10 @@ class TestToolRegistration:
 
     @pytest.mark.asyncio
     async def test_tool_count(self) -> None:
-        """Server should have exactly 22 tools registered."""
+        """Server should have exactly 25 tools registered."""
         from mcp_workboard_crunchtools.server import mcp
 
-        assert len(await mcp.list_tools()) == 22
+        assert len(await mcp.list_tools()) == 25
 
     @pytest.mark.asyncio
     async def test_integer_ids_publish_minimum(self) -> None:
@@ -106,8 +106,12 @@ READ_ONLY = frozenset(
         "workboard_list_activities_tool",
         "workboard_get_activity_tool",
         "workboard_get_my_objectives_tool",
+        "workboard_auth_status_tool",
+        "workboard_auth_result_tool",
     }
 )
+# Read-only tools answered from server memory, with no WorkBoard request.
+LOCAL_ONLY = frozenset({"workboard_auth_result_tool"})
 # Everything that does not publish the hint.
 WRITES = frozenset(
     {
@@ -119,6 +123,7 @@ WRITES = frozenset(
         "workboard_update_workstream_tool",
         "workboard_create_activity_tool",
         "workboard_update_activity_tool",
+        "workboard_auth_start_tool",
     }
 )
 
@@ -138,6 +143,8 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "workboard_list_activities_tool": {"ai_state": "doing", "limit": 5, "offset": 0},
     "workboard_get_activity_tool": {"activity_id": 11},
     "workboard_get_my_objectives_tool": {"objective_ids": [5]},
+    "workboard_auth_status_tool": {},
+    "workboard_auth_result_tool": {},
 }
 
 
@@ -186,6 +193,9 @@ class TestReadOnlyAnnotation:
             await mcp.call_tool(name, READ_ONLY_CALLS[name])
 
         requests = client_cls.return_value.request.await_args_list
+        if name in LOCAL_ONLY:
+            assert requests == []
+            return
         assert len(requests) >= 1
         assert {call.kwargs["method"] for call in requests} <= {"GET", "HEAD"}
 
