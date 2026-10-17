@@ -38,6 +38,9 @@ class Config:
         Raises:
             ConfigurationError: If required environment variables are missing.
         """
+        from .auth import REDIRECT_URI_VAR
+
+        self._oauth_redirect_uri = os.environ.get(REDIRECT_URI_VAR, "").strip() or None
         token = self._load_static_token()
         if token:
             self._auth_mode = AuthMode.STATIC_TOKEN
@@ -107,11 +110,9 @@ class Config:
         Unset means browser authorization from the server is unavailable: a
         container has no localhost the user's browser can reach, so there is
         nowhere for WorkBoard to send them. The CLI `login` does not read this;
-        it always listens on localhost.
+        it always listens on localhost. Read once, when Config is built.
         """
-        from .auth import REDIRECT_URI_VAR
-
-        return os.environ.get(REDIRECT_URI_VAR, "").strip() or None
+        return self._oauth_redirect_uri
 
     @property
     def token(self) -> str:
