@@ -1,9 +1,10 @@
 """FastMCP server setup for WorkBoard MCP."""
 
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from .models import KeyResultInput
 from .tools import (
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 # A gateway drops an invalid optional argument only on a tool annotated read-only;
 # on anything else it refuses the call. Only tools that change nothing get this.
 READ_ONLY = {"readOnlyHint": True}
+
+# Integer IDs publish ge=1 so a gateway can prove 0 and negative IDs invalid.
+PositiveId = Annotated[int, Field(ge=1)]
 
 mcp = FastMCP(
     name="mcp-workboard",
@@ -71,7 +75,7 @@ mcp = FastMCP(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_user_tool(
-    user_id: int | None = None,
+    user_id: PositiveId | None = None,
 ) -> dict[str, Any]:
     """Get a WorkBoard user by ID, or the current authenticated user.
 
@@ -123,7 +127,7 @@ async def workboard_create_user_tool(
 
 @mcp.tool()
 async def workboard_update_user_tool(
-    user_id: int,
+    user_id: PositiveId,
     first_name: str | None = None,
     last_name: str | None = None,
     email: str | None = None,
@@ -164,7 +168,7 @@ async def workboard_get_teams_tool() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ_ONLY)
-async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
+async def workboard_get_team_members_tool(team_id: PositiveId) -> dict[str, Any]:
     """Get all members of a WorkBoard team, including their user IDs and emails.
 
     Use this to resolve a person's name or email to their WorkBoard user_id.
@@ -181,7 +185,7 @@ async def workboard_get_team_members_tool(team_id: int) -> dict[str, Any]:
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_objectives_tool(
-    user_id: int,
+    user_id: PositiveId,
 ) -> dict[str, Any]:
     """Get objectives owned by a WorkBoard user by their user ID.
 
@@ -202,8 +206,8 @@ async def workboard_get_objectives_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_objective_details_tool(
-    user_id: int,
-    objective_id: int,
+    user_id: PositiveId,
+    objective_id: PositiveId,
 ) -> dict[str, Any]:
     """Get full details for a single objective including all its key results.
 
@@ -222,9 +226,9 @@ async def workboard_get_objective_details_tool(
     return await get_objective_details(user_id=user_id, objective_id=objective_id)
 
 
-@mcp.tool()
+@mcp.tool(annotations=READ_ONLY)
 async def workboard_get_my_objectives_tool(
-    objective_ids: list[int] | None = None,
+    objective_ids: Annotated[list[PositiveId], Field(max_length=25)] | None = None,
 ) -> dict[str, Any]:
     """Get the current authenticated user's objectives with key results.
 
@@ -233,7 +237,7 @@ async def workboard_get_my_objectives_tool(
     from their key results — no IDs needed.
 
     Args:
-        objective_ids: Optional list of specific objective IDs to fetch.
+        objective_ids: Optional list of specific objective IDs to fetch (at most 25).
                        If not provided, objectives are auto-discovered from
                        the user's key results.
 
@@ -268,7 +272,7 @@ async def workboard_get_my_key_results_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_user_key_results_tool(
-    user_id: int,
+    user_id: PositiveId,
     include_prior_years: bool = False,
 ) -> dict[str, Any]:
     """List key results (metrics) for a specific WorkBoard user by their user ID.
@@ -297,7 +301,7 @@ async def workboard_get_user_key_results_tool(
 
 @mcp.tool()
 async def workboard_update_key_result_tool(
-    metric_id: int,
+    metric_id: PositiveId,
     value: str,
     comment: str | None = None,
 ) -> dict[str, Any]:
@@ -379,7 +383,7 @@ async def workboard_create_objective_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_workstreams_tool(
-    ws_id: int | None = None,
+    ws_id: PositiveId | None = None,
 ) -> dict[str, Any]:
     """Get team workstreams accessible to the authenticated user.
 
@@ -397,7 +401,7 @@ async def workboard_get_workstreams_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_workstream_activities_tool(
-    ws_id: int,
+    ws_id: PositiveId,
 ) -> dict[str, Any]:
     """Get a workstream's full details including all action items.
 
@@ -415,7 +419,7 @@ async def workboard_get_workstream_activities_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_team_workstreams_tool(
-    team_id: int,
+    team_id: PositiveId,
 ) -> dict[str, Any]:
     """Get all workstreams belonging to a specific team.
 
@@ -460,7 +464,7 @@ async def workboard_create_workstream_tool(
 
 @mcp.tool()
 async def workboard_update_workstream_tool(
-    ws_id: int,
+    ws_id: PositiveId,
     ws_name: str | None = None,
     ws_start_date: str | None = None,
     ws_end_date: str | None = None,
@@ -535,7 +539,7 @@ async def workboard_list_activities_tool(
 
 @mcp.tool(annotations=READ_ONLY)
 async def workboard_get_activity_tool(
-    activity_id: int,
+    activity_id: PositiveId,
 ) -> dict[str, Any]:
     """Get a single WorkBoard action item by its ID.
 
@@ -601,7 +605,7 @@ async def workboard_create_activity_tool(
 
 @mcp.tool()
 async def workboard_update_activity_tool(
-    activity_id: int,
+    activity_id: PositiveId,
     ai_description: str | None = None,
     ai_note: str | None = None,
     ai_owner: str | None = None,

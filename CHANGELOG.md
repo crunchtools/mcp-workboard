@@ -8,6 +8,16 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+### Fixed
+- **Integer ID parameters publish `ge=1`.** All `user_id`, `objective_id`,
+  `team_id`, `metric_id`, `ws_id` and `activity_id` arguments (read and write
+  tools) now reject `0` and negative values in the registered schema, as the
+  MCP Server profile (Layer 2) requires.
+- **`workboard_get_my_objectives_tool` is annotated `readOnlyHint`.**
+  `objective_ids` is now capped at 25 positive IDs; longer lists are rejected.
+- `workboard_get_team_members_tool` validates `team_id` before building the
+  request path, like `get_team_workstreams`.
+
 ## [0.11.1] - 2026-10-10
 
 ### Fixed
