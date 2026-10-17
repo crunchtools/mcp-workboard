@@ -377,10 +377,25 @@ class TestUserTools:
             }
         )
 
-        with _patch_client(resp):
+        with _patch_client(resp) as mock_cls:
             result = await list_users()
 
         assert "users" in result
+        params = mock_cls.return_value.request.call_args.kwargs["params"]
+        assert params == {"include": "org_members", "limit": 100}
+
+    @pytest.mark.asyncio
+    async def test_list_users_pagination(self) -> None:
+        """list_users should pass limit and offset alongside include=org_members."""
+        from mcp_workboard_crunchtools.tools import list_users
+
+        resp = _mock_response(json_data={"data": []})
+
+        with _patch_client(resp) as mock_cls:
+            await list_users(limit=50, offset=100)
+
+        params = mock_cls.return_value.request.call_args.kwargs["params"]
+        assert params == {"include": "org_members", "limit": 50, "offset": 100}
 
     @pytest.mark.asyncio
     async def test_create_user(self) -> None:
