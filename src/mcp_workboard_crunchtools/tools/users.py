@@ -32,15 +32,31 @@ async def get_user(
     return {"user": response}
 
 
-async def list_users() -> dict[str, Any]:
+async def list_users(
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict[str, Any]:
     """List all WorkBoard users (requires Data-Admin role).
+
+    Bare GET /user returns only the caller; include=org_members is what
+    returns the organization's users, and it needs a Data-Admin token.
+
+    Args:
+        limit: Maximum number of users to return (optional)
+        offset: Number of users to skip (optional)
 
     Returns:
         Dictionary containing list of all users
     """
     client = get_client()
 
-    response = await client.get("/user")
+    params: dict[str, Any] = {"include": "org_members"}
+    if limit is not None:
+        params["limit"] = limit
+    if offset is not None:
+        params["offset"] = offset
+
+    response = await client.get("/user", params=params)
 
     return {"users": response}
 
