@@ -21,11 +21,43 @@ class TestToolRegistration:
 
         assert mcp is not None
 
-    def test_tool_count(self) -> None:
+    @pytest.mark.asyncio
+    async def test_tool_count(self) -> None:
         """Server should have exactly 22 tools registered."""
-        from mcp_workboard_crunchtools.tools import __all__
+        from mcp_workboard_crunchtools.server import mcp
 
-        assert len(__all__) == 22
+        assert len(await mcp.list_tools()) == 22
+
+    @pytest.mark.asyncio
+    async def test_integer_ids_publish_minimum(self) -> None:
+        """Every integer ID parameter publishes ge=1 in the registered schema."""
+        from mcp_workboard_crunchtools.server import mcp
+
+        id_names = {"user_id", "objective_id", "team_id", "metric_id", "ws_id", "activity_id"}
+        checked = 0
+        for tool in await mcp.list_tools():
+            for name, prop in tool.parameters.get("properties", {}).items():
+                if name not in id_names:
+                    continue
+                variants = prop.get("anyOf", [prop])
+                ints = [v for v in variants if v.get("type") == "integer"]
+                if not ints:
+                    continue  # string-typed IDs (create_workstream)
+                assert ints[0].get("minimum") == 1, f"{tool.name}.{name}"
+                checked += 1
+        assert checked == 14
+
+    @pytest.mark.asyncio
+    async def test_my_objectives_ids_capped(self) -> None:
+        """objective_ids is capped at 25 positive IDs."""
+        from mcp_workboard_crunchtools.server import mcp
+
+        tool = await mcp.get_tool("workboard_get_my_objectives_tool")
+        assert tool is not None
+        prop = tool.parameters["properties"]["objective_ids"]
+        arr = next(v for v in prop["anyOf"] if v.get("type") == "array")
+        assert arr["maxItems"] == 25
+        assert arr["items"]["minimum"] == 1
 
     def test_imports(self) -> None:
         """All tool functions should be importable."""
@@ -73,16 +105,14 @@ READ_ONLY = frozenset(
         "workboard_get_team_workstreams_tool",
         "workboard_list_activities_tool",
         "workboard_get_activity_tool",
+        "workboard_get_my_objectives_tool",
     }
 )
-# Everything that does not publish the hint. workboard_get_my_objectives_tool
-# changes nothing, but it sends one GET per objective ID and the caller sets how
-# many, so one call is not bounded by the cost of an ordinary request.
+# Everything that does not publish the hint.
 WRITES = frozenset(
     {
         "workboard_create_user_tool",
         "workboard_update_user_tool",
-        "workboard_get_my_objectives_tool",
         "workboard_update_key_result_tool",
         "workboard_create_objective_tool",
         "workboard_create_workstream_tool",
@@ -107,6 +137,7 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "workboard_get_team_workstreams_tool": {"team_id": 3},
     "workboard_list_activities_tool": {"ai_state": "doing", "limit": 5, "offset": 0},
     "workboard_get_activity_tool": {"activity_id": 11},
+    "workboard_get_my_objectives_tool": {"objective_ids": [5]},
 }
 
 

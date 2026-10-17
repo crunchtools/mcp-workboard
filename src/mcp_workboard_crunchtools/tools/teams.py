@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..client import get_client
+from ..models import validate_user_id
 
 
 def _format_team(team: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +54,7 @@ async def get_teams() -> dict[str, Any]:
 
 async def get_team_members(team_id: int) -> dict[str, Any]:
     """Fetch all members of a specific team by team_id."""
+    team_id = validate_user_id(team_id)
     client = get_client()
     response = await client.get(f"/team/{team_id}/user")
 
