@@ -7,7 +7,7 @@ import sys
 # Imported through routes so the /callback route is registered on the instance.
 from .routes import mcp
 
-__version__ = "0.13.1"
+__version__ = "0.14.0"
 __all__ = ["main", "mcp"]
 
 

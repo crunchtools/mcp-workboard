@@ -4,6 +4,7 @@ These tests verify tool behavior without making actual API calls.
 """
 
 import os
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -23,10 +24,10 @@ class TestToolRegistration:
 
     @pytest.mark.asyncio
     async def test_tool_count(self) -> None:
-        """Server should have exactly 26 tools registered."""
+        """Server should have exactly 27 tools registered."""
         from mcp_workboard_crunchtools.server import mcp
 
-        assert len(await mcp.list_tools()) == 26
+        assert len(await mcp.list_tools()) == 27
 
     @pytest.mark.asyncio
     async def test_integer_ids_publish_minimum(self) -> None:
@@ -45,7 +46,7 @@ class TestToolRegistration:
                     continue  # string-typed IDs (create_workstream)
                 assert ints[0].get("minimum") == 1, f"{tool.name}.{name}"
                 checked += 1
-        assert checked == 15
+        assert checked == 16
 
     @pytest.mark.asyncio
     async def test_my_objectives_ids_capped(self) -> None:
@@ -103,6 +104,7 @@ READ_ONLY = frozenset(
         "workboard_get_workstreams_tool",
         "workboard_get_workstream_activities_tool",
         "workboard_get_workstream_columns_tool",
+        "workboard_get_team_objectives_tool",
         "workboard_get_team_workstreams_tool",
         "workboard_list_activities_tool",
         "workboard_get_activity_tool",
@@ -141,6 +143,11 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "workboard_get_workstreams_tool": {"ws_id": 9},
     "workboard_get_workstream_activities_tool": {"ws_id": 9},
     "workboard_get_workstream_columns_tool": {"ws_id": 9},
+    "workboard_get_team_objectives_tool": {
+        "team_id": 3,
+        "start_date": "2026-01-01",
+        "end_date": "2026-03-31",
+    },
     "workboard_get_team_workstreams_tool": {"team_id": 3},
     "workboard_list_activities_tool": {"ai_state": "doing", "limit": 5, "offset": 0},
     "workboard_get_activity_tool": {"activity_id": 11},
@@ -549,6 +556,86 @@ class TestObjectiveTools:
         assert "objectives" in result
         assert len(result["objectives"]) == 1
         assert result["objectives"][0]["name"] == "Ship v1"
+
+    @staticmethod
+    def _paged_goals(goals: list[dict], page_size: int = 50):
+        """Serve ``goals`` from GET /goal by offset, with the misleading per-page
+        totalCount the live API returns; every other path gets an empty body."""
+
+        async def request(*, url: str, params: dict | None = None, **_: object):
+            if url != "/goal":
+                return _mock_response(json_data={"data": {}})
+            offset = (params or {}).get("offset", 0)
+            page = goals[offset : offset + page_size]
+            return _mock_response(
+                json_data={
+                    "data": {
+                        "totalCount": 13,
+                        "goal": {str(i): g for i, g in enumerate(page)},
+                    }
+                }
+            )
+
+        return request
+
+    @pytest.mark.asyncio
+    async def test_get_objectives_pages_past_total_count(self) -> None:
+        """get_objectives keeps paging though totalCount says fewer goals exist."""
+        from mcp_workboard_crunchtools.tools import get_objectives
+
+        goals = [{"goal_id": i, "goal_name": f"G{i}"} for i in range(1, 121)]
+        with _patch_client(_mock_response()) as mock_client:
+            mock_client.return_value.request.side_effect = self._paged_goals(goals)
+            result = await get_objectives(user_id=42)
+
+        assert len(result["objectives"]) == 120
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives_filters_team_and_window(self) -> None:
+        """Only the team's goals overlapping the window come back, past quarters included."""
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        def ts(day: str) -> str:
+            parsed = datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            return str(int(parsed.timestamp()))
+
+        def goal(gid: int, team: str, start: str, end: str) -> dict:
+            return {
+                "goal_id": gid,
+                "goal_name": f"G{gid}",
+                "goal_team_id": team,
+                "goal_start_date": ts(start),
+                "goal_target_date": ts(end),
+            }
+
+        filler = [goal(1000 + i, "999", "2026-01-01", "2026-12-31") for i in range(60)]
+        goals = [
+            goal(1, "561838", "2026-01-01", "2026-03-31"),  # Q1, in window
+            goal(2, "561838", "2026-01-01", "2026-12-31"),  # annual, overlaps
+            goal(3, "561838", "2026-04-01", "2026-06-30"),  # Q2, outside
+            goal(4, "559247", "2026-01-01", "2026-03-31"),  # other team
+            *filler,
+            goal(5, "561838", "2026-03-31", "2026-04-15"),  # starts on the last day, page 2
+        ]
+        with _patch_client(_mock_response()) as mock_client:
+            mock_client.return_value.request.side_effect = self._paged_goals(goals)
+            result = await get_team_objectives(
+                team_id=561838, start_date="2026-01-01", end_date="2026-03-31"
+            )
+
+        assert sorted(o["objective_id"] for o in result["objectives"]) == [1, 2, 5]
+        assert result["window"] == "2026-01-01 to 2026-03-31"
+
+    @pytest.mark.asyncio
+    async def test_get_team_objectives_rejects_bad_dates(self) -> None:
+        """Non-ISO or reversed dates are refused before any API call."""
+        from mcp_workboard_crunchtools.errors import UserError
+        from mcp_workboard_crunchtools.tools import get_team_objectives
+
+        with pytest.raises(UserError, match="YYYY-MM-DD"):
+            await get_team_objectives(team_id=1, start_date="04/01/2026", end_date="2026-06-30")
+        with pytest.raises(UserError, match="before start_date"):
+            await get_team_objectives(team_id=1, start_date="2026-06-30", end_date="2026-04-01")
 
     @pytest.mark.asyncio
     async def test_get_objective_details(self) -> None:

@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from ..client import get_client
+from ..client import WorkBoardClient, get_client
 from ..errors import UserError
 from ..models import (
     CreateObjectiveInput,
@@ -187,6 +187,116 @@ def _current_year_start() -> int:
     return int(datetime(now.year, 1, 1, tzinfo=timezone.utc).timestamp())
 
 
+# The live API honors limit=50 on GET /goal (verified); the 15-result
+# cap applied to the old /user/{id}/goal endpoint.
+_GOAL_PAGE_SIZE = 50
+_GOAL_PAGES_PER_BATCH = 4
+_GOAL_MAX_PAGES = 40
+_SECONDS_PER_DAY = 86400
+
+
+async def _fetch_all_goals(client: WorkBoardClient, params: dict[str, Any]) -> list[dict[str, Any]]:
+    """Page through ``GET /goal`` until the results run out.
+
+    ``totalCount`` cannot be trusted to stop on: live, it reads 13, 14, then 1
+    on successive pages of the same query. Paging stops on a short page or one
+    that adds nothing new. The first page is fetched alone, so a query that
+    fits in one page costs one request; after that, pages are fetched a batch
+    at a time because WorkBoard takes 15-45s per page. Capped at
+    ``_GOAL_MAX_PAGES``.
+    """
+    seen: dict[Any, dict[str, Any]] = {}
+
+    def absorb(response: dict[str, Any]) -> bool:
+        """Record a page's goals; True when it shows the results have run out."""
+        page = _extract_goals_from_goal_response(response.get("data", {}))
+        new = [g for g in page if g.get("goal_id") not in seen]
+        seen.update((g.get("goal_id"), g) for g in new)
+        return len(page) < _GOAL_PAGE_SIZE or not new
+
+    async def fetch(offset: int) -> dict[str, Any]:
+        page_params = {**params, "limit": _GOAL_PAGE_SIZE, "offset": offset}
+        return await client.get("/goal", params=page_params)
+
+    if absorb(await fetch(0)):
+        return list(seen.values())
+
+    offset = _GOAL_PAGE_SIZE
+    while offset < _GOAL_PAGE_SIZE * _GOAL_MAX_PAGES:
+        offsets = [offset + i * _GOAL_PAGE_SIZE for i in range(_GOAL_PAGES_PER_BATCH)]
+        responses = await asyncio.gather(*(fetch(o) for o in offsets))
+        # Absorb every page before deciding: any() would stop at the first.
+        exhausted = [absorb(r) for r in responses]
+        if any(exhausted):
+            break
+        offset += _GOAL_PAGE_SIZE * _GOAL_PAGES_PER_BATCH
+    return list(seen.values())
+
+
+def _parse_iso_date(value: str, field: str) -> int:
+    """Parse YYYY-MM-DD to a UTC midnight Unix timestamp."""
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError) as e:
+        raise UserError(f"Invalid {field}. Expected YYYY-MM-DD.") from e
+    return int(parsed.timestamp())
+
+
+def _goal_overlaps(goal: dict[str, Any], start_ts: int, end_ts: int) -> bool:
+    """True when the goal's start-to-target span touches [start_ts, end_ts]."""
+    try:
+        goal_start = int(goal.get("goal_start_date") or 0)
+        goal_target = int(goal.get("goal_target_date") or 0)
+    except (ValueError, TypeError):
+        return False
+    return goal_start <= end_ts and goal_target >= start_ts
+
+
+async def get_team_objectives(
+    team_id: int,
+    start_date: str,
+    end_date: str,
+) -> dict[str, Any]:
+    """Get a team's objectives whose dates overlap a window, past quarters included.
+
+    The API ignores ``goal_team_id`` on ``GET /goal`` and ``/team/{id}/goal``
+    returns no goals, so this pages every objective the caller can see and
+    filters on ``goal_team_id`` and date overlap here. Sub-teams are not
+    included. Expect it to take a minute: WorkBoard is slow per page.
+
+    Args:
+        team_id: Team ID (positive integer)
+        start_date: Window start, YYYY-MM-DD
+        end_date: Window end, YYYY-MM-DD (inclusive)
+
+    Returns:
+        Dictionary with the team ID, window, and matching objectives
+    """
+    if not isinstance(team_id, int) or team_id <= 0:
+        raise UserError("Invalid team_id. Expected a positive integer.")
+    start_ts = _parse_iso_date(start_date, "start_date")
+    end_ts = _parse_iso_date(end_date, "end_date") + _SECONDS_PER_DAY - 1
+    if end_ts < start_ts:
+        raise UserError("end_date is before start_date.")
+
+    client = get_client()
+    all_goals, metric_target_dates = await asyncio.gather(
+        _fetch_all_goals(client, {}),
+        _fetch_target_date_map(client),
+    )
+
+    matching = [
+        g
+        for g in all_goals
+        if str(g.get("goal_team_id")) == str(team_id) and _goal_overlaps(g, start_ts, end_ts)
+    ]
+    return {
+        "team_id": team_id,
+        "window": f"{start_date} to {end_date}",
+        "objectives": [_format_goal(g, metric_target_dates) for g in matching],
+    }
+
+
 async def get_objectives(
     user_id: int,
 ) -> dict[str, Any]:
@@ -207,41 +317,10 @@ async def get_objectives(
     user_id = validate_user_id(user_id)
     client = get_client()
 
-    page_size = 100
-
-    first_response, metric_target_dates = await asyncio.gather(
-        client.get(
-            "/goal",
-            params={
-                "goal_owner_id": user_id,
-                "goal_status": 1,
-                "limit": page_size,
-                "offset": 0,
-            },
-        ),
+    all_goals, metric_target_dates = await asyncio.gather(
+        _fetch_all_goals(client, {"goal_owner_id": user_id, "goal_status": 1}),
         _fetch_target_date_map(client),
     )
-
-    first_body = first_response.get("data", {})
-    total_count = int(first_body.get("totalCount", 0))
-    all_goals: list[dict[str, Any]] = _extract_goals_from_goal_response(first_body)
-
-    offset = page_size
-    while len(all_goals) < total_count:
-        page_response = await client.get(
-            "/goal",
-            params={
-                "goal_owner_id": user_id,
-                "goal_status": 1,
-                "limit": page_size,
-                "offset": offset,
-            },
-        )
-        page_goals = _extract_goals_from_goal_response(page_response.get("data", {}))
-        if not page_goals:
-            break
-        all_goals.extend(page_goals)
-        offset += page_size
 
     return {
         "objectives": [_format_goal(g, metric_target_dates) for g in all_goals],

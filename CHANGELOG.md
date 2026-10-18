@@ -8,6 +8,22 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-17
+
+### Added
+- `workboard_get_team_objectives_tool` returns a team's objectives whose dates
+  overlap a YYYY-MM-DD window, past quarters included, for quarterly OKR
+  snapshots (#24, #25). The API ignores `goal_team_id` on `GET /goal`,
+  `/team/{id}/goal` returns no goals, and the web app's `goalSummary` needs a
+  browser session, so the tool pages every objective the caller can see and
+  filters by team and date itself. Sub-teams are not included. It takes about
+  a minute. Based on Gunnar Hellekson's draft.
+
+### Fixed
+- `workboard_get_objectives_tool` stopped after the first page: it trusted
+  `totalCount`, which the live API reports per page (13, 14, 1). Paging now
+  runs until a short or repeated page.
+
 ## [0.13.1] - 2026-10-17
 
 ### Fixed
