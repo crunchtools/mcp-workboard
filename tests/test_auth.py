@@ -156,7 +156,8 @@ class TestTokenStore:
 
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 200
-        mock_response.raise_for_status = MagicMock()
+        mock_response.is_success = True
+        mock_response.content = b"{}"
         mock_response.json.return_value = {
             "access_token": "new-token",
             "refresh_token": "new-refresh",
@@ -179,6 +180,39 @@ class TestTokenStore:
         reloaded = store.load()
         assert reloaded is not None
         assert reloaded.access_token.get_secret_value() == "new-token"
+
+    def test_refresh_failure_names_oauth_error(self, tmp_path: Path) -> None:
+        store = TokenStore(path=tmp_path / "tokens.json")
+        store.save(
+            TokenData(
+                access_token=SecretStr("old-token"),
+                refresh_token=SecretStr("spent-refresh"),
+                expires_at=time.time() - 100,
+            )
+        )
+        rejected = httpx.Response(
+            status_code=400,
+            json={
+                "success": False,
+                "error": "invalid_refresh_token",
+                "error_description": "Invalid refresh token",
+            },
+            request=httpx.Request("POST", FAKE_TOKEN_URL),
+        )
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.post.return_value = rejected
+
+        with (
+            patch("mcp_workboard_crunchtools.auth.httpx.Client", return_value=mock_client),
+            pytest.raises(TokenExpiredError, match=r"HTTP 400 \(invalid_refresh_token\)"),
+        ):
+            store.get_access_token(
+                client_id="cid",
+                client_secret=SecretStr("csecret"),
+                token_url=FAKE_TOKEN_URL,
+            )
 
     def test_get_access_token_oversized_refresh_rejected(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

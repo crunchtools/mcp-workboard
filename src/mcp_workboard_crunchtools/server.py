@@ -47,7 +47,7 @@ PositiveId = Annotated[int, Field(ge=1)]
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.13.0",
+    version="0.13.1",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "

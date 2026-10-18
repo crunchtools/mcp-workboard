@@ -184,27 +184,66 @@ class TokenStore:
                     f"Access token expired and no refresh token available. {REAUTH_HINT}"
                 )
 
-            try:
-                with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
-                    response = http.post(
-                        token_url,
-                        data={
-                            "grant_type": "refresh_token",
-                            "refresh_token": token.refresh_token.get_secret_value(),
-                            "client_id": client_id,
-                            "client_hash": client_secret.get_secret_value(),
-                        },
-                    )
-                    response.raise_for_status()
-                    if len(response.content) > MAX_RESPONSE_SIZE:
-                        raise TokenExpiredError(f"Token refresh response too large. {REAUTH_HINT}")
-                    token_response = response.json()
-            except (httpx.HTTPError, ValueError) as e:
-                raise TokenExpiredError(f"Token refresh failed: {e}. {REAUTH_HINT}") from e
-
+            token_response = _post_refresh(token_url, client_id, client_secret, token.refresh_token)
             new_data = _parse_token_response(token_response, token.refresh_token)
             self.save(new_data)
             return new_data.access_token.get_secret_value()
+
+
+def _post_refresh(
+    token_url: str,
+    client_id: str,
+    client_secret: SecretStr,
+    refresh_token: SecretStr,
+) -> dict[str, Any]:
+    """Spend a refresh token at WorkBoard's token endpoint.
+
+    A failure names WorkBoard's OAuth error code (e.g. ``invalid_refresh_token``)
+    so a dead token is told apart from a bad client secret. Whether WorkBoard
+    rotates refresh tokens is unverified, so a success logs the response's key
+    names — never values — and warns when no new refresh token came back.
+    """
+    try:
+        with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
+            response = http.post(
+                token_url,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token.get_secret_value(),
+                    "client_id": client_id,
+                    "client_hash": client_secret.get_secret_value(),
+                },
+            )
+            if not response.is_success:
+                raise TokenExpiredError(
+                    f"Token refresh failed: HTTP {response.status_code} "
+                    f"{_oauth_error_code(response)}. {REAUTH_HINT}"
+                )
+            if len(response.content) > MAX_RESPONSE_SIZE:
+                raise TokenExpiredError(f"Token refresh response too large. {REAUTH_HINT}")
+            token_response = response.json()
+    except (httpx.HTTPError, ValueError) as e:
+        raise TokenExpiredError(f"Token refresh failed: {e}. {REAUTH_HINT}") from e
+    if not isinstance(token_response, dict):
+        raise TokenExpiredError(f"Token refresh returned an unexpected response. {REAUTH_HINT}")
+
+    logger.info("Token refresh succeeded; response keys: %s", sorted(token_response))
+    if not token_response.get("refresh_token"):
+        logger.warning("Token refresh returned no refresh_token; keeping the old one")
+    return token_response
+
+
+def _oauth_error_code(response: httpx.Response) -> str:
+    """Return the OAuth ``error`` code from a failed token response, e.g.
+    ``invalid_refresh_token``. Only the code is kept: it is a fixed token from
+    the OAuth vocabulary, while free-text fields are not needed to diagnose."""
+    try:
+        error = response.json().get("error")
+    except (ValueError, AttributeError):
+        return "(no error code)"
+    if isinstance(error, str) and error.replace("_", "").isalnum() and len(error) <= 64:
+        return f"({error})"
+    return "(no error code)"
 
 
 def _parse_token_response(
