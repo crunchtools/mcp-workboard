@@ -50,7 +50,7 @@ IsoDate = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.14.0",
+    version="0.14.1",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "

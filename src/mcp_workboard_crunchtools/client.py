@@ -58,6 +58,7 @@ class WorkBoardClient:
         path: str,
         params: dict[str, Any] | None = None,
         json_data: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> dict[str, Any]:
         """Make an API request with error handling.
 
@@ -66,6 +67,7 @@ class WorkBoardClient:
             path: API path (e.g., /user)
             params: Query parameters
             json_data: JSON body data
+            timeout: Seconds, overriding REQUEST_TIMEOUT for a known-slow call
 
         Returns:
             API response data
@@ -87,6 +89,7 @@ class WorkBoardClient:
                 params=params,
                 json=json_data,
                 headers=auth_headers,
+                timeout=httpx.USE_CLIENT_DEFAULT if timeout is None else timeout,
             )
         except httpx.TimeoutException as e:
             raise WorkBoardApiError(0, f"Request timeout: {e}") from e
@@ -128,9 +131,14 @@ class WorkBoardClient:
             case _:
                 raise WorkBoardApiError(status_code, str(error_msg))
 
-    async def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def get(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """Make a GET request."""
-        return await self._request("GET", path, params=params)
+        return await self._request("GET", path, params=params, timeout=timeout)
 
     async def post(
         self,

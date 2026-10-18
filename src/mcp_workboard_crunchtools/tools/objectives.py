@@ -187,23 +187,25 @@ def _current_year_start() -> int:
     return int(datetime(now.year, 1, 1, tzinfo=timezone.utc).timestamp())
 
 
-# The live API honors limit=50 on GET /goal (verified); the 15-result
-# cap applied to the old /user/{id}/goal endpoint.
-_GOAL_PAGE_SIZE = 50
+# GET /goal honors limit (it counts objectives; totalCount counts the people
+# they are grouped under). Latency grows with page size and swings widely —
+# measured 1.5s at 10, ~7s at 25, 9-47s at 50 — so pages are small, fetched
+# four at a time, and allowed longer than the client's default timeout.
+_GOAL_PAGE_SIZE = 25
 _GOAL_PAGES_PER_BATCH = 4
-_GOAL_MAX_PAGES = 40
+_GOAL_MAX_PAGES = 80
+_GOAL_PAGE_TIMEOUT = 90.0
 _SECONDS_PER_DAY = 86400
 
 
 async def _fetch_all_goals(client: WorkBoardClient, params: dict[str, Any]) -> list[dict[str, Any]]:
     """Page through ``GET /goal`` until the results run out.
 
-    ``totalCount`` cannot be trusted to stop on: live, it reads 13, 14, then 1
-    on successive pages of the same query. Paging stops on a short page or one
+    ``totalCount`` cannot be stopped on: it counts the people a page's
+    objectives are grouped under, not objectives. Paging stops on a short page or one
     that adds nothing new. The first page is fetched alone, so a query that
     fits in one page costs one request; after that, pages are fetched a batch
-    at a time because WorkBoard takes 15-45s per page. Capped at
-    ``_GOAL_MAX_PAGES``.
+    at a time. Capped at ``_GOAL_MAX_PAGES``.
     """
     seen: dict[Any, dict[str, Any]] = {}
 
@@ -216,7 +218,7 @@ async def _fetch_all_goals(client: WorkBoardClient, params: dict[str, Any]) -> l
 
     async def fetch(offset: int) -> dict[str, Any]:
         page_params = {**params, "limit": _GOAL_PAGE_SIZE, "offset": offset}
-        return await client.get("/goal", params=page_params)
+        return await client.get("/goal", params=page_params, timeout=_GOAL_PAGE_TIMEOUT)
 
     if absorb(await fetch(0)):
         return list(seen.values())
