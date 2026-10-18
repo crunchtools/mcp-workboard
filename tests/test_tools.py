@@ -558,7 +558,7 @@ class TestObjectiveTools:
         assert result["objectives"][0]["name"] == "Ship v1"
 
     @staticmethod
-    def _paged_goals(goals: list[dict], page_size: int = 50):
+    def _paged_goals(goals: list[dict]):
         """Serve ``goals`` from GET /goal by offset, with the misleading per-page
         totalCount the live API returns; every other path gets an empty body."""
 
@@ -566,7 +566,7 @@ class TestObjectiveTools:
             if url != "/goal":
                 return _mock_response(json_data={"data": {}})
             offset = (params or {}).get("offset", 0)
-            page = goals[offset : offset + page_size]
+            page = goals[offset : offset + (params or {}).get("limit", 50)]
             return _mock_response(
                 json_data={
                     "data": {

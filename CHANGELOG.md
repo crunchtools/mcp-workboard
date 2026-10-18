@@ -8,6 +8,14 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-10-17
+
+### Fixed
+- `workboard_get_team_objectives_tool` timed out in production: `GET /goal`
+  pages of 50 took 9-47s, past the client's 30s timeout. Pages are now 25
+  objectives (about 7s), fetched four at a time with a 90s timeout for those
+  calls only.
+
 ## [0.14.0] - 2026-10-17
 
 ### Added
