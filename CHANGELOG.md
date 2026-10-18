@@ -8,6 +8,16 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-17
+
+### Fixed
+- A failed token refresh now names WorkBoard's OAuth error code, e.g.
+  `HTTP 400 (invalid_refresh_token)`, instead of a bare "400 Bad Request", so
+  a spent refresh token is told apart from a bad client secret.
+- A successful refresh logs the response's key names (never values) and warns
+  when no new refresh token came back. Whether WorkBoard rotates refresh
+  tokens is still unverified; this is what will settle it.
+
 ## [0.13.0] - 2026-10-17
 
 ### Added
