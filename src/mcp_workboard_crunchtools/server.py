@@ -26,6 +26,7 @@ from .tools import (
     get_user,
     get_user_key_results,
     get_workstream_activities,
+    get_workstream_columns,
     get_workstreams,
     list_activities,
     list_users,
@@ -46,7 +47,7 @@ PositiveId = Annotated[int, Field(ge=1)]
 
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.12.0",
+    version="0.13.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -66,6 +67,7 @@ mcp = FastMCP(
         "and target date.\n\n"
         "WORKSTREAMS: Use workboard_get_workstreams_tool to list accessible workstreams, "
         "workboard_get_workstream_activities_tool to see action items for a workstream, "
+        "workboard_get_workstream_columns_tool to see its Kanban columns, "
         "and workboard_get_team_workstreams_tool to see workstreams for a specific team.\n\n"
         "ACTION ITEMS: Use workboard_list_activities_tool to list action items with optional "
         "filters, workboard_get_activity_tool to get a single action item by ID, "
@@ -465,6 +467,25 @@ async def workboard_get_workstream_activities_tool(
         Workstream details with action items
     """
     return await get_workstream_activities(ws_id=ws_id)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def workboard_get_workstream_columns_tool(
+    ws_id: PositiveId,
+) -> dict[str, Any]:
+    """Get the custom Kanban columns in use on a workstream.
+
+    The API has no column endpoint, so columns are read off the workstream's
+    action items. A column with no cards in it will not appear. Use the
+    column_id values to tell which column a card sits in.
+
+    Args:
+        ws_id: Workstream ID (positive integer)
+
+    Returns:
+        Workstream ID, name, and list of columns with column_id and column_name
+    """
+    return await get_workstream_columns(ws_id=ws_id)
 
 
 @mcp.tool(annotations=READ_ONLY)
