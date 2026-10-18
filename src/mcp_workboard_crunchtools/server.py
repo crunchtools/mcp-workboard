@@ -21,6 +21,7 @@ from .tools import (
     get_objective_details,
     get_objectives,
     get_team_members,
+    get_team_objectives,
     get_team_workstreams,
     get_teams,
     get_user,
@@ -45,9 +46,11 @@ READ_ONLY = {"readOnlyHint": True}
 # Integer IDs publish ge=1 so a gateway can prove 0 and negative IDs invalid.
 PositiveId = Annotated[int, Field(ge=1)]
 
+IsoDate = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
+
 mcp = FastMCP(
     name="mcp-workboard",
-    version="0.13.1",
+    version="0.14.0",
     instructions=(
         "Secure MCP server for WorkBoard OKR and strategy execution platform. "
         "WorkBoard tracks Objectives (goals) and Key Results (metrics). "
@@ -65,6 +68,9 @@ mcp = FastMCP(
         "  - Key Result 2: current of target\n"
         "For key result lists without objectives, use a flat bulleted list with name, progress, "
         "and target date.\n\n"
+        "TEAM OKR SNAPSHOTS: For a team's objectives in a given quarter, including past "
+        "quarters, use workboard_get_team_objectives_tool with a team_id and YYYY-MM-DD "
+        "start_date/end_date. It takes about a minute.\n\n"
         "WORKSTREAMS: Use workboard_get_workstreams_tool to list accessible workstreams, "
         "workboard_get_workstream_activities_tool to see action items for a workstream, "
         "workboard_get_workstream_columns_tool to see its Kanban columns, "
@@ -254,6 +260,31 @@ async def workboard_get_objectives_tool(
         List of objectives owned by the user, including all key results
     """
     return await get_objectives(user_id=user_id)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def workboard_get_team_objectives_tool(
+    team_id: PositiveId,
+    start_date: IsoDate,
+    end_date: IsoDate,
+) -> dict[str, Any]:
+    """Get a team's objectives whose dates overlap a window, past quarters included.
+
+    Use this for quarterly OKR reviews or snapshots, e.g. Q1 after March 31.
+    Objectives on sub-teams are not included. Slow: it reads every objective
+    you can see, which takes about a minute.
+
+    Use workboard_get_teams_tool to find team IDs.
+
+    Args:
+        team_id: Team ID (positive integer)
+        start_date: Window start, YYYY-MM-DD (e.g. the first day of a quarter)
+        end_date: Window end, YYYY-MM-DD, inclusive (e.g. the last day of a quarter)
+
+    Returns:
+        Objectives with progress, owner, status color, dates, and key results
+    """
+    return await get_team_objectives(team_id=team_id, start_date=start_date, end_date=end_date)
 
 
 @mcp.tool(annotations=READ_ONLY)

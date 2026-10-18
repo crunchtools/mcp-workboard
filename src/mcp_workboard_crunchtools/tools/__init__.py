@@ -16,6 +16,7 @@ from .objectives import (
     get_my_objectives,
     get_objective_details,
     get_objectives,
+    get_team_objectives,
     get_user_key_results,
     update_key_result,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "get_teams",
     "get_team_members",
     "get_objectives",
+    "get_team_objectives",
     "get_objective_details",
     "get_my_objectives",
     "get_my_key_results",

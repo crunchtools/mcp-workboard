@@ -39,8 +39,9 @@ The container image is built on the [Hummingbird Python base image](https://quay
 - `workboard_create_user_tool` - Create a new user (Data-Admin role required)
 - `workboard_update_user_tool` - Update an existing user
 
-### Objective Management (4 tools)
-- `workboard_get_objectives_tool` - Get objectives associated with a user (API capped at 15)
+### Objective Management (5 tools)
+- `workboard_get_objectives_tool` - Get all objectives a user owns
+- `workboard_get_team_objectives_tool` - Get a team's objectives overlapping a date window, past quarters included (slow: reads every visible objective)
 - `workboard_get_objective_details_tool` - Get details for a specific objective with key results
 - `workboard_get_my_objectives_tool` - Get the current user's owned objectives by ID (recommended)
 - `workboard_create_objective_tool` - Create a new objective with key results (Data-Admin required)
