@@ -156,7 +156,7 @@ class TestTokenStore:
 
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 200
-        mock_response.is_error = False
+        mock_response.is_success = True
         mock_response.content = b"{}"
         mock_response.json.return_value = {
             "access_token": "new-token",

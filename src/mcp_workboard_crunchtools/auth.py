@@ -214,7 +214,7 @@ def _post_refresh(
                     "client_hash": client_secret.get_secret_value(),
                 },
             )
-            if response.is_error:
+            if not response.is_success:
                 raise TokenExpiredError(
                     f"Token refresh failed: HTTP {response.status_code} "
                     f"{_oauth_error_code(response)}. {REAUTH_HINT}"
