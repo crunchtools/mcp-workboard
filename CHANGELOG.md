@@ -8,6 +8,15 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-17
+
+### Added
+- `workboard_get_workstream_columns_tool` lists the custom Kanban columns in
+  use on a workstream, and `workboard_get_workstream_activities_tool` now
+  returns the same `columns` catalog alongside the action items. The API has
+  no column endpoint, so columns come from the cards; an empty column does not
+  appear. Contributed by Gunnar Hellekson (#23).
+
 ## [0.12.0] - 2026-10-17
 
 ### Added

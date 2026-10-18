@@ -23,10 +23,10 @@ class TestToolRegistration:
 
     @pytest.mark.asyncio
     async def test_tool_count(self) -> None:
-        """Server should have exactly 25 tools registered."""
+        """Server should have exactly 26 tools registered."""
         from mcp_workboard_crunchtools.server import mcp
 
-        assert len(await mcp.list_tools()) == 25
+        assert len(await mcp.list_tools()) == 26
 
     @pytest.mark.asyncio
     async def test_integer_ids_publish_minimum(self) -> None:
@@ -45,7 +45,7 @@ class TestToolRegistration:
                     continue  # string-typed IDs (create_workstream)
                 assert ints[0].get("minimum") == 1, f"{tool.name}.{name}"
                 checked += 1
-        assert checked == 14
+        assert checked == 15
 
     @pytest.mark.asyncio
     async def test_my_objectives_ids_capped(self) -> None:
@@ -102,6 +102,7 @@ READ_ONLY = frozenset(
         "workboard_get_user_key_results_tool",
         "workboard_get_workstreams_tool",
         "workboard_get_workstream_activities_tool",
+        "workboard_get_workstream_columns_tool",
         "workboard_get_team_workstreams_tool",
         "workboard_list_activities_tool",
         "workboard_get_activity_tool",
@@ -139,6 +140,7 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "workboard_get_user_key_results_tool": {"user_id": 7, "include_prior_years": True},
     "workboard_get_workstreams_tool": {"ws_id": 9},
     "workboard_get_workstream_activities_tool": {"ws_id": 9},
+    "workboard_get_workstream_columns_tool": {"ws_id": 9},
     "workboard_get_team_workstreams_tool": {"team_id": 3},
     "workboard_list_activities_tool": {"ai_state": "doing", "limit": 5, "offset": 0},
     "workboard_get_activity_tool": {"activity_id": 11},
@@ -1032,6 +1034,202 @@ class TestWorkstreamTools:
         assert ws["action_items"][0]["column_id"] == "15"
         assert ws["action_items"][0]["column_name"] == "Interlocks"
         assert len(ws["action_items"][0]["comments"]) == 1
+        assert "columns" in ws
+        assert ws["columns"] == [{"column_id": "15", "column_name": "Interlocks"}]
+
+    @pytest.mark.asyncio
+    async def test_get_workstream_activities_multiple_columns(self) -> None:
+        """get_workstream_activities should deduplicate columns from action items."""
+        from mcp_workboard_crunchtools.tools import get_workstream_activities
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "200",
+                        "ws_name": "Roadmap",
+                        "ws_objective": "",
+                        "ws_owner": "1",
+                        "ws_lead": "2",
+                        "ws_status": "active",
+                        "ws_type": "team",
+                        "ws_pace": "steady",
+                        "ws_health": "good",
+                        "ws_priority": "p1",
+                        "ws_progress": "0",
+                        "ws_start_date": "2026-01-01",
+                        "ws_target_date": "2026-06-30",
+                        "ws_completion_date": None,
+                        "ws_team_id": "10",
+                        "ws_team_name": "Eng",
+                        "ws_activity": {
+                            "activity": [
+                                {
+                                    "ai_id": "601",
+                                    "ai_description": "Task A",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "50", "name": "Planned"},
+                                },
+                                {
+                                    "ai_id": "602",
+                                    "ai_description": "Task B",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "51", "name": "In Progress"},
+                                },
+                                {
+                                    "ai_id": "603",
+                                    "ai_description": "Task C",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "50", "name": "Planned"},
+                                },
+                            ],
+                            "activity_count": 3,
+                        },
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_workstream_activities(ws_id=200)
+
+        ws = result["workstream"]
+        assert len(ws["action_items"]) == 3
+        assert "columns" in ws
+        assert len(ws["columns"]) == 2
+        column_ids = {c["column_id"] for c in ws["columns"]}
+        assert column_ids == {"50", "51"}
+
+    @pytest.mark.asyncio
+    async def test_get_workstream_activities_no_columns(self) -> None:
+        """Workstreams without custom columns should not include a columns key."""
+        from mcp_workboard_crunchtools.tools import get_workstream_activities
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "300",
+                        "ws_name": "Plain Board",
+                        "ws_objective": "",
+                        "ws_owner": "1",
+                        "ws_lead": "2",
+                        "ws_status": "active",
+                        "ws_type": "team",
+                        "ws_pace": "steady",
+                        "ws_health": "good",
+                        "ws_priority": "p2",
+                        "ws_progress": "0",
+                        "ws_start_date": "2026-01-01",
+                        "ws_target_date": "2026-06-30",
+                        "ws_completion_date": None,
+                        "ws_team_id": "10",
+                        "ws_team_name": "Eng",
+                        "ws_activity": {
+                            "activity": [
+                                {
+                                    "ai_id": "701",
+                                    "ai_description": "No column task",
+                                    "ai_state": "next",
+                                },
+                            ],
+                            "activity_count": 1,
+                        },
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_workstream_activities(ws_id=300)
+
+        ws = result["workstream"]
+        assert len(ws["action_items"]) == 1
+        assert "columns" not in ws
+
+    @pytest.mark.asyncio
+    async def test_get_workstream_columns(self) -> None:
+        """get_workstream_columns should return deduplicated column list."""
+        from mcp_workboard_crunchtools.tools import get_workstream_columns
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "400",
+                        "ws_name": "Kanban Board",
+                        "ws_activity": {
+                            "activity": [
+                                {
+                                    "ai_id": "801",
+                                    "ai_description": "Card A",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "60", "name": "Planned"},
+                                },
+                                {
+                                    "ai_id": "802",
+                                    "ai_description": "Card B",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "61", "name": "In Progress"},
+                                },
+                                {
+                                    "ai_id": "803",
+                                    "ai_description": "Card C",
+                                    "ai_state": "doing",
+                                    "ai_column": {"id": "60", "name": "Planned"},
+                                },
+                            ],
+                            "activity_count": 3,
+                        },
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_workstream_columns(ws_id=400)
+
+        assert result["ws_id"] == "400"
+        assert result["name"] == "Kanban Board"
+        assert len(result["columns"]) == 2
+        column_ids = {c["column_id"] for c in result["columns"]}
+        assert column_ids == {"60", "61"}
+
+    @pytest.mark.asyncio
+    async def test_get_workstream_columns_none(self) -> None:
+        """get_workstream_columns with no custom columns returns empty list."""
+        from mcp_workboard_crunchtools.tools import get_workstream_columns
+
+        resp = _mock_response(
+            json_data={
+                "data": {
+                    "totalCount": 1,
+                    "workstream": {
+                        "ws_id": "500",
+                        "ws_name": "Plain Board",
+                        "ws_activity": {
+                            "activity": [
+                                {
+                                    "ai_id": "901",
+                                    "ai_description": "Task",
+                                    "ai_state": "next",
+                                },
+                            ],
+                            "activity_count": 1,
+                        },
+                    },
+                },
+            }
+        )
+
+        with _patch_client(resp):
+            result = await get_workstream_columns(ws_id=500)
+
+        assert result["ws_id"] == "500"
+        assert result["columns"] == []
 
     @pytest.mark.asyncio
     async def test_get_team_workstreams(self) -> None:

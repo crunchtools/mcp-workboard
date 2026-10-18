@@ -49,9 +49,10 @@ The container image is built on the [Hummingbird Python base image](https://quay
 - `workboard_get_my_key_results_tool` - List current user's key results with metric IDs and progress
 - `workboard_update_key_result_tool` - Update key result progress for weekly OKR check-ins
 
-### Workstream Management (5 tools)
+### Workstream Management (6 tools)
 - `workboard_get_workstreams_tool` - Get team workstreams accessible to the authenticated user
 - `workboard_get_workstream_activities_tool` - Get workstream details with all action items
+- `workboard_get_workstream_columns_tool` - List the Kanban columns in use on a workstream
 - `workboard_get_team_workstreams_tool` - Get all workstreams belonging to a specific team
 - `workboard_create_workstream_tool` - Create a new workstream for a team
 - `workboard_update_workstream_tool` - Update workstream properties (name, dates, pace, health, priority)
