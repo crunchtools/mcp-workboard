@@ -8,6 +8,11 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+### Security
+
+- Upgraded locked dependencies within their declared ranges to clear the
+  advisories the fleet dependency audit found (authlib, certifi, dnspython, fastmcp, joserfc, opentelemetry-api, pyjwt).
+
 ## [0.15.0] - 2026-10-20
 
 ### Changed
