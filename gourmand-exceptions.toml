@@ -167,3 +167,14 @@ check = "manifest_lint_suppression"
 path = "pyproject.toml"
 justification = "The project-wide ruff ignore list has had no line-by-line review. The claim previously recorded here -- that these are all style choices rather than quality or correctness lints -- is false: S105 is a flake8-bandit SECURITY rule, and PLR2004, PLC0415 and PLW0603 are correctness and structural rules. Several inline comments also describe a single file or test-only situation while the ignore is applied project-wide. Classified as accepted debt, not design, so it keeps counting against this repo's score until a fleet-wide ruff policy is decided (RT #1482)."
 classification = "accepted_bad_taste"
+
+# Ruff is not missing; it moved. Gourmand's IF001 looks for a literal
+# `ruff-check` hook id, and under python-sdlc (constitution XII, v1.30.0) ruff
+# runs inside the `sdlc-commit` hook, configured by [tool.ruff] in
+# pyproject.toml. Same precedent as trentina.
+[[exceptions]]
+check = "linter_configuration"
+path = ".pre-commit-config.yaml"
+pattern = "ruff-check"
+justification = "ruff runs inside the sdlc-commit hook from python-sdlc (constitution XII v1.30.0), configured by [tool.ruff] in pyproject.toml; Gourmand looks for a literal ruff hook id"
+classification = "by_design"
