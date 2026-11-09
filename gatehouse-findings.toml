@@ -1,0 +1,40 @@
+# Judged Gatehouse findings. Each needs a status and a reason; see
+# crunchtools/gatehouse. Both entries are the same finding on the two read
+# paths, raised against the RT #1601 outbound HTTP contract work
+# (constitution v1.36.0, MCP Server profile 1.8.0).
+
+# MEDIUM x2: `bytes(bytearray)` copies the accumulated body, so the peak is
+# briefly twice the cap. True. It is not fixed here because the five lines it
+# quotes are the fleet's canonical bounded read, shared by fourteen repos; a
+# change to the shape belongs with the shape, not in one copy of it.
+[[findings]]
+agent = "performance"
+category = "performance"
+file = "src/mcp_workboard_crunchtools/client.py"
+evidence = "return bytes(body)"
+status = "not-a-bug"
+reason = """
+Correct about the copy, and it is bounded by the same cap that just bounded the
+read: the peak is 2x a deliberately chosen 10MB, once, after the read has
+already succeeded. Against that, these five lines are the canonical bounded
+read in fourteen repos of this fleet, settled over three review rounds, and the
+whole point of RT #1601 is that a hand-copied stanza cannot propagate. Changing
+one copy to return a mutable buffer would put this repo out of step with
+thirteen others for a transient allocation, and leave a `bytearray` in the
+hands of callers that are typed for `bytes`. Noted on
+https://github.com/crunchtools/constitution/issues/106, which is where the
+shared shape next changes.
+"""
+
+[[findings]]
+agent = "performance"
+category = "performance"
+file = "src/mcp_workboard_crunchtools/auth.py"
+evidence = "return bytes(body)"
+status = "not-a-bug"
+reason = """
+Same five lines, same answer as the client.py entry: a bounded one-time copy
+after a successful read, in the shape fourteen repos share. The token path's
+body is a handful of JSON fields in practice, so the 2x peak this describes is
+hypothetical here in a way it is not even on the API path.
+"""
