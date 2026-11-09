@@ -2,9 +2,9 @@
 
 > **Version:** 1.4.0
 > **Ratified:** 2026-03-10
-> **Amended:** 2026-10-17
+> **Amended:** 2026-11-09
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.36.0
 > **Profile:** MCP Server
 
 This file holds what is specific to mcp-workboard. The fleet rules and the
@@ -33,7 +33,8 @@ are not restated here.
   format-validated; strings are length-bounded; emails are validated.
   `NotFoundError` truncates long identifiers.
 - **API:** auth travels in a `Bearer` header, never the URL. TLS is always
-  validated; responses above 10 MB are rejected and requests time out.
+  validated; responses above 10 MB are rejected while reading, not after the
+  whole body has been held in memory; and requests time out.
 - **No delete tools.** The client has a `delete` method, but no tool exposes
   it.
 

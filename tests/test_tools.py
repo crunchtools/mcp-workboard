@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from tests.conftest import _mock_response, _patch_client
+from tests.conftest import _mock_response, _patch_client, dispatch_on_kwargs
 
 
 class TestToolRegistration:
@@ -201,7 +201,7 @@ class TestReadOnlyAnnotation:
         with _patch_client(resp) as client_cls:
             await mcp.call_tool(name, READ_ONLY_CALLS[name])
 
-        requests = client_cls.return_value.request.await_args_list
+        requests = client_cls.return_value.build_request.call_args_list
         if name in LOCAL_ONLY:
             assert requests == []
             return
@@ -402,7 +402,7 @@ class TestUserTools:
             result = await list_users()
 
         assert len(result["users"]["data"]["user"]) == 2
-        params = mock_cls.return_value.request.call_args.kwargs["params"]
+        params = mock_cls.return_value.build_request.call_args.kwargs["params"]
         assert params == {"include": "team_members"}
 
     @pytest.mark.asyncio
@@ -428,7 +428,7 @@ class TestUserTools:
         with _patch_client(resp) as mock_cls:
             await list_users(scope="org", limit=50, offset=100)
 
-        params = mock_cls.return_value.request.call_args.kwargs["params"]
+        params = mock_cls.return_value.build_request.call_args.kwargs["params"]
         assert params == {"include": "org_members", "limit": 50, "offset": 100}
 
     @pytest.mark.asyncio
@@ -585,7 +585,7 @@ class TestObjectiveTools:
 
         goals = [{"goal_id": i, "goal_name": f"G{i}"} for i in range(1, 121)]
         with _patch_client(_mock_response()) as mock_client:
-            mock_client.return_value.request.side_effect = self._paged_goals(goals)
+            dispatch_on_kwargs(mock_client.return_value, self._paged_goals(goals))
             result = await get_objectives(user_id=42)
 
         assert len(result["objectives"]) == 120
@@ -618,7 +618,7 @@ class TestObjectiveTools:
             goal(5, "561838", "2026-03-31", "2026-04-15"),  # starts on the last day, page 2
         ]
         with _patch_client(_mock_response()) as mock_client:
-            mock_client.return_value.request.side_effect = self._paged_goals(goals)
+            dispatch_on_kwargs(mock_client.return_value, self._paged_goals(goals))
             result = await get_team_objectives(
                 team_id=561838, start_date="2026-01-01", end_date="2026-03-31"
             )
@@ -728,7 +728,7 @@ class TestObjectiveTools:
                 return metric_resp
             return goal_resp
 
-        mock_http.request = AsyncMock(side_effect=side_effect)
+        dispatch_on_kwargs(mock_http, side_effect)
 
         with patch.object(httpx, "AsyncClient", return_value=mock_http):
             result = await get_my_objectives()
@@ -957,7 +957,7 @@ class TestKeyResultTools:
                 return update_resp
             return metric_list_resp
 
-        mock_http.request = AsyncMock(side_effect=side_effect)
+        dispatch_on_kwargs(mock_http, side_effect)
 
         with patch.object(httpx, "AsyncClient", return_value=mock_http):
             result = await update_key_result(metric_id=10, value="75")
@@ -1435,7 +1435,7 @@ class TestWorkstreamTools:
                 return update_resp
             return read_resp
 
-        mock_http.request = AsyncMock(side_effect=side_effect)
+        dispatch_on_kwargs(mock_http, side_effect)
 
         with patch.object(httpx, "AsyncClient", return_value=mock_http):
             result = await update_workstream(ws_id=100, ws_health="risk")
@@ -1624,7 +1624,7 @@ class TestActivityTools:
                 return update_resp
             return read_resp
 
-        mock_http.request = AsyncMock(side_effect=side_effect)
+        dispatch_on_kwargs(mock_http, side_effect)
 
         with patch.object(httpx, "AsyncClient", return_value=mock_http):
             result = await update_activity(activity_id=500, ai_state="done")
