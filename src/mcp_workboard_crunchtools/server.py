@@ -424,9 +424,16 @@ async def workboard_create_objective_tool(
 ) -> dict[str, Any]:
     """Create a new objective with optional key results.
 
-    Creates Team or Individual objectives. Requires an OAuth token whose account
-    has the Data-Admin role; instant JWT tokens cannot create objectives. The API
-    has no update or delete for objectives — those are UI-only.
+    Creates Team or Individual objectives. The API has no update or delete for
+    objectives — those are UI-only, so a name or date that is wrong at creation
+    stays wrong until someone fixes it in the web UI.
+
+    This used to say Data-Admin was required and that instant JWT tokens cannot
+    create objectives. That is wrong: an instant token carrying
+    ``isSuperUser: false`` creates objectives and checks in progress against
+    their key results. Data-Admin does gate other calls, ``scope="org"`` on
+    workboard_list_users_tool among them, so do not generalise from that to
+    every write; test the specific call instead of assuming either way.
 
     Team objectives must be tied to a team: pass ``team`` (a team ID from
     workboard_get_teams_tool). Provide the objective name, owner, dates, and

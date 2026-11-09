@@ -35,9 +35,11 @@ claude mcp add mcp-workboard \
 
 Two auth modes, chosen by which environment variables are set:
 
-**Static JWT Token** — Set `WORKBOARD_API_TOKEN` or `WORKBOARD_API_TOKEN_FILE`. Quick setup but limited permissions: instant tokens have `isSuperUser: false`, which blocks objective and key-result creation (reads work fine). Use OAuth for writes.
+**Static JWT Token** — Set `WORKBOARD_API_TOKEN` or `WORKBOARD_API_TOKEN_FILE`. Quick setup. Instant tokens carry `isSuperUser: false`, but that does **not** block writes the way this file used to claim: verified 2026-11-09, an instant token created an individual objective with a key result and checked in progress against it. What `isSuperUser: false` does block is narrower, `scope="org"` on `workboard_list_users_tool` for one. Test the specific call rather than assuming a static token is read only.
 
 > **API limitation:** the WorkBoard Goal resource exposes only GET and POST — there is no update or delete for objectives via the API. Edit or delete objectives in the WorkBoard UI. (Key results *can* be updated via `/metric`.)
+
+> **Gotcha: a truncated token looks like a permissions problem.** WorkBoard elides the JWT in its display box, so a copy can lose the end of the signature and still be three dot separated segments. The server then reports `Permission denied. Required scope: Valid API token`, which sends you hunting for a role you already have. WorkBoard's own reply is `invalid_access_token`. Check the signature length before anything else: RS256 signs with 2048 bit RSA, so the third segment must be 342 base64url characters. Seen 2026-11-09 with a 123 character signature (RT #1595).
 
 **OAuth 2** — Set `WORKBOARD_CLIENT_ID` + `WORKBOARD_CLIENT_SECRET`, then run `mcp-workboard-crunchtools login`. This opens your browser for WorkBoard authorization and saves tokens to `~/.config/mcp-workboard/tokens.json`. OAuth tokens carry your full user permissions. Tokens auto-refresh when expired.
 
