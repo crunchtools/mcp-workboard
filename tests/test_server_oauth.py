@@ -66,12 +66,15 @@ def _token_http(status_code: int = 200, content: bytes | None = None) -> MagicMo
     """Mock httpx.Client used for the token exchange."""
     http = MagicMock()
     body = content if content is not None else json.dumps(TOKEN_JSON).encode()
-    http.post.return_value = httpx.Response(
+    response = httpx.Response(
         status_code=status_code,
         content=body,
         headers={"content-type": "application/json"},
         request=httpx.Request("POST", auth_mod.OAUTH_TOKEN_URL),
     )
+    # `stream()` rather than `post()`: the token read is bounded while it
+    # arrives now, so it goes through a streaming context manager.
+    http.stream.return_value.__enter__.return_value = response
     client_cls = MagicMock()
     client_cls.return_value.__enter__.return_value = http
     return client_cls
@@ -155,9 +158,11 @@ class TestCallback:
         assert "new-at" not in body
 
         http = client_cls.return_value.__enter__.return_value
-        http.post.assert_called_once()
-        assert http.post.call_args.args[0] == auth_mod.OAUTH_TOKEN_URL
-        assert http.post.call_args.kwargs["data"] == {
+        # `stream("POST", url, data=...)` rather than `post(url, data=...)`:
+        # the token read is bounded while it arrives.
+        http.stream.assert_called_once()
+        assert http.stream.call_args.args == ("POST", auth_mod.OAUTH_TOKEN_URL)
+        assert http.stream.call_args.kwargs["data"] == {
             "client_id": "test-cid",
             "client_hash": "test-csecret",
             "code": "the-code",
@@ -186,7 +191,7 @@ class TestCallback:
         body = bytes(response.body).decode()
         assert "<script>" not in body
         assert "&lt;script&gt;access_denied" in body
-        client_cls.return_value.__enter__.return_value.post.assert_not_called()
+        client_cls.return_value.__enter__.return_value.stream.assert_not_called()
         assert not oauth_env.exists()
         assert fresh_pending.outcome is not None
         assert "denied" in fresh_pending.outcome
@@ -202,7 +207,7 @@ class TestCallback:
 
         assert response.status_code == 400
         assert "no authorization code" in bytes(response.body).decode()
-        client_cls.return_value.__enter__.return_value.post.assert_not_called()
+        client_cls.return_value.__enter__.return_value.stream.assert_not_called()
         assert not oauth_env.exists()
         assert fresh_pending.outcome is not None
         assert "no authorization code" in fresh_pending.outcome
@@ -219,7 +224,7 @@ class TestCallback:
             response = await oauth_callback(_request({"code": "c", "state": "forged"}))
 
         assert response.status_code == 400
-        client_cls.return_value.__enter__.return_value.post.assert_not_called()
+        client_cls.return_value.__enter__.return_value.stream.assert_not_called()
         assert not oauth_env.exists()
 
     @pytest.mark.asyncio
@@ -302,7 +307,7 @@ class TestCallback:
 
         assert response.status_code == 400
         assert "too long" in bytes(response.body).decode()
-        client_cls.return_value.__enter__.return_value.post.assert_not_called()
+        client_cls.return_value.__enter__.return_value.stream.assert_not_called()
         # The real state is still usable: an oversized request consumes nothing.
         fresh_pending.verify(state)
         assert not oauth_env.exists()
@@ -367,7 +372,7 @@ class TestAuthTools:
             _patch_client(resp) as client_cls,
         ):
             text = await auth_status()
-        call = client_cls.return_value.request.await_args
+        call = client_cls.return_value.build_request.call_args
         assert call.kwargs["method"] == "GET"
         assert "verified" in text
         assert "Account: me@example.com" in text
@@ -398,7 +403,10 @@ class TestAuthTools:
         )
         resp = _mock_response(status_code=401, json_data={"message": "bad token"})
         mock_http = MagicMock(spec=httpx.AsyncClient)
-        mock_http.request = AsyncMock(return_value=resp)
+        # The client streams now: a real client builds the request and `send`
+        # answers it.
+        mock_http.build_request = MagicMock(side_effect=httpx.Client().build_request)
+        mock_http.send = AsyncMock(return_value=resp)
         with patch.object(httpx, "AsyncClient", return_value=mock_http):
             text = await auth_status()
         assert "Token present: yes" in text

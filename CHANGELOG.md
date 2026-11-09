@@ -8,6 +8,43 @@ Entries prior to 2026-09-19 are back-filled from GitHub Release notes (RT #1484)
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-09
+
+### Fixed
+
+- **The response cap was checked after the body was already in memory.** All
+  three read paths — the API client and both OAuth token exchanges — compared
+  `len(response.content)` once the whole body had arrived, so the memory the
+  limit exists to protect had already been spent by the time it looked. All
+  three now read in bounded pieces, measured before each chunk is copied in.
+
+- **An error says which site answered, and with what.** A non-JSON body came
+  back as `Invalid JSON response: Expecting value: line 1 column 1 (char 0)`
+  with nothing to act on — the RT #1596 shape. It now names the method, the
+  URL, the status, the content-type and a short body snippet. WorkBoard's own
+  `message` is used exactly as before, and the token paths still keep to the
+  OAuth error vocabulary rather than quoting a body, which was a deliberate
+  choice there and stays one.
+
+- **A transport failure names the request.** `Request timeout: <httpx error>`
+  did not say which endpoint, and httpx's message does not reliably carry it.
+
+### Added
+
+- **The client says what it is**, on all three — the API client and both token
+  exchanges — with the version read from installed package metadata.
+
+### Changed
+
+- The suite's mock stands in for `build_request` and `send` rather than
+  `request`, and the token tests drive `stream()` rather than `post()`, because
+  the reads are bounded while they arrive now. `tests/test_http_contract.py`
+  uses a real client over `httpx.MockTransport`, because the agent string and
+  the bounded read are the client's own behaviour.
+
+- Inherits constitution v1.36.0, whose MCP Server profile 1.8.0 states the
+  outbound HTTP contract (RT #1601).
+
 ## [0.15.1] - 2026-10-31
 
 ### Security

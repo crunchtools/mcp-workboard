@@ -154,20 +154,22 @@ class TestTokenStore:
         )
         store.save(data)
 
-        mock_response = MagicMock(spec=httpx.Response)
-        mock_response.status_code = 200
-        mock_response.is_success = True
-        mock_response.content = b"{}"
-        mock_response.json.return_value = {
-            "access_token": "new-token",
-            "refresh_token": "new-refresh",
-            "expires_in": 3600,
-        }
+        # A real response rather than a MagicMock: the token read is bounded
+        # while it arrives now, so it needs real headers and a real stream.
+        mock_response = httpx.Response(
+            status_code=200,
+            json={
+                "access_token": "new-token",
+                "refresh_token": "new-refresh",
+                "expires_in": 3600,
+            },
+            request=httpx.Request("POST", FAKE_TOKEN_URL),
+        )
 
         mock_client = MagicMock(spec=httpx.Client)
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.post.return_value = mock_response
+        mock_client.stream.return_value.__enter__.return_value = mock_response
 
         with patch("mcp_workboard_crunchtools.auth.httpx.Client", return_value=mock_client):
             token = store.get_access_token(
@@ -202,7 +204,7 @@ class TestTokenStore:
         mock_client = MagicMock(spec=httpx.Client)
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.post.return_value = rejected
+        mock_client.stream.return_value.__enter__.return_value = rejected
 
         with (
             patch("mcp_workboard_crunchtools.auth.httpx.Client", return_value=mock_client),
@@ -236,7 +238,7 @@ class TestTokenStore:
         mock_client = MagicMock(spec=httpx.Client)
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.post.return_value = oversized
+        mock_client.stream.return_value.__enter__.return_value = oversized
 
         with (
             patch("mcp_workboard_crunchtools.auth.httpx.Client", return_value=mock_client),

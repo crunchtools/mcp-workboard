@@ -1,6 +1,8 @@
 """WorkBoard API client with security hardening."""
 
+import json
 import logging
+from importlib.metadata import version
 from typing import Any
 
 import httpx
@@ -17,6 +19,60 @@ logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024
 REQUEST_TIMEOUT = 30.0
+BODY_SNIPPET_CHARS = 200
+ELLIPSIS = "..."
+
+# Identify this client by name. httpx otherwise sends `python-httpx/<version>`,
+# which bot protection answers with an HTML challenge page instead of the API --
+# the failure that cost an afternoon on mcp-wordpress (RT #1596). The version
+# comes from installed package metadata so it cannot drift from pyproject.toml.
+USER_AGENT = (
+    f"mcp-workboard-crunchtools/{version('mcp-workboard-crunchtools')} "
+    "(+https://github.com/crunchtools/mcp-workboard)"
+)
+
+
+def _body_snippet(body: bytes) -> str:
+    """A short, single-line excerpt of a response body, for an error message."""
+    prefix = body[: BODY_SNIPPET_CHARS * 4]
+    collapsed = " ".join(prefix.decode("utf-8", errors="replace").split())
+    if not collapsed:
+        return "<empty body>"
+    if len(collapsed) > BODY_SNIPPET_CHARS or len(body) > len(prefix):
+        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
+    return collapsed
+
+
+def _where(response: httpx.Response) -> str:
+    """Which request a response answered, for an error message."""
+    return (
+        f"{response.request.method} {response.request.url} "
+        f"(HTTP {response.status_code}, {response.headers.get('content-type', 'no content-type')})"
+    )
+
+
+async def read_capped(response: httpx.Response, oversize: str) -> bytes:
+    """Read the body, aborting as soon as it would pass MAX_RESPONSE_SIZE.
+
+    Shared with `auth.py`, whose token exchanges had the same post-hoc check.
+    `oversize` is the message to raise, because the token paths deliberately
+    keep their errors to a fixed vocabulary rather than quoting a body.
+
+    One buffer, measured before the copy: `aiter_bytes()` promises nothing about
+    chunk size -- one chunk can be the whole body -- so appending first would
+    copy in exactly the response being refused. Checking `len(response.content)`
+    afterwards, which is what this replaces, had already spent the memory the
+    limit exists to protect.
+    """
+    declared = response.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_RESPONSE_SIZE:
+        raise WorkBoardApiError(response.status_code, oversize)
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        if len(body) + len(chunk) > MAX_RESPONSE_SIZE:
+            raise WorkBoardApiError(response.status_code, oversize)
+        body += chunk
+    return bytes(body)
 
 
 class WorkBoardClient:
@@ -40,7 +96,7 @@ class WorkBoardClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 base_url=self._config.api_base_url,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
                 timeout=httpx.Timeout(REQUEST_TIMEOUT),
                 verify=True,
             )
@@ -83,7 +139,7 @@ class WorkBoardClient:
         logger.debug("API request: %s %s", method, path)
 
         try:
-            response = await client.request(
+            request = client.build_request(
                 method=method,
                 url=path,
                 params=params,
@@ -91,19 +147,25 @@ class WorkBoardClient:
                 headers=auth_headers,
                 timeout=httpx.USE_CLIENT_DEFAULT if timeout is None else timeout,
             )
+            response = await client.send(request, stream=True)
+            try:
+                body = await read_capped(
+                    response, f"Response over the {MAX_RESPONSE_SIZE} byte limit"
+                )
+            finally:
+                await response.aclose()
         except httpx.TimeoutException as e:
-            raise WorkBoardApiError(0, f"Request timeout: {e}") from e
+            raise WorkBoardApiError(0, f"Request timeout: {method} {path}: {e}") from e
         except httpx.RequestError as e:
-            raise WorkBoardApiError(0, f"Request failed: {e}") from e
-
-        body = response.content
-        if len(body) > MAX_RESPONSE_SIZE:
-            raise WorkBoardApiError(0, "Response too large")
+            raise WorkBoardApiError(0, f"Request failed: {method} {path}: {e}") from e
 
         try:
-            parsed = response.json()
+            parsed = json.loads(body)
         except ValueError as e:
-            raise WorkBoardApiError(response.status_code, f"Invalid JSON response: {e}") from e
+            raise WorkBoardApiError(
+                response.status_code,
+                f"{_where(response)} is not JSON ({e}): {_body_snippet(body)}",
+            ) from e
 
         if not response.is_success:
             self._handle_error_response(response.status_code, parsed)

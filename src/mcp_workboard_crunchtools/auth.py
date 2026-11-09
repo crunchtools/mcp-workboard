@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - Windows has no fcntl
 import httpx
 from pydantic import BaseModel, SecretStr
 
-from .client import MAX_RESPONSE_SIZE
+from .client import MAX_RESPONSE_SIZE, USER_AGENT
 from .errors import AuthenticationError, TokenExpiredError
 
 logger = logging.getLogger(__name__)
@@ -204,8 +204,11 @@ def _post_refresh(
     names — never values — and warns when no new refresh token came back.
     """
     try:
-        with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
-            response = http.post(
+        with httpx.Client(
+            timeout=HTTP_TIMEOUT, verify=True, headers={"User-Agent": USER_AGENT}
+        ) as http:
+            with http.stream(
+                "POST",
                 token_url,
                 data={
                     "grant_type": "refresh_token",
@@ -213,15 +216,14 @@ def _post_refresh(
                     "client_id": client_id,
                     "client_hash": client_secret.get_secret_value(),
                 },
-            )
+            ) as response:
+                body = _read_capped(response, f"Token refresh response too large. {REAUTH_HINT}")
             if not response.is_success:
                 raise TokenExpiredError(
                     f"Token refresh failed: HTTP {response.status_code} "
-                    f"{_oauth_error_code(response)}. {REAUTH_HINT}"
+                    f"{_oauth_error_code(body)}. {REAUTH_HINT}"
                 )
-            if len(response.content) > MAX_RESPONSE_SIZE:
-                raise TokenExpiredError(f"Token refresh response too large. {REAUTH_HINT}")
-            token_response = response.json()
+            token_response = json.loads(body)
     except (httpx.HTTPError, ValueError) as e:
         raise TokenExpiredError(f"Token refresh failed: {e}. {REAUTH_HINT}") from e
     if not isinstance(token_response, dict):
@@ -233,12 +235,32 @@ def _post_refresh(
     return token_response
 
 
-def _oauth_error_code(response: httpx.Response) -> str:
+def _read_capped(response: httpx.Response, oversize: str) -> bytes:
+    """Read a token response, aborting as soon as it would pass the limit.
+
+    The synchronous twin of `client.read_capped`, for the two token exchanges.
+    Both used to compare `len(response.content)` after reading the whole body,
+    which had already spent the memory the limit exists to protect.
+    """
+    declared = response.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_RESPONSE_SIZE:
+        raise TokenExpiredError(oversize)
+    body = bytearray()
+    for chunk in response.iter_bytes():
+        if len(body) + len(chunk) > MAX_RESPONSE_SIZE:
+            raise TokenExpiredError(oversize)
+        body += chunk
+    return bytes(body)
+
+
+def _oauth_error_code(body: bytes) -> str:
     """Return the OAuth ``error`` code from a failed token response, e.g.
     ``invalid_refresh_token``. Only the code is kept: it is a fixed token from
-    the OAuth vocabulary, while free-text fields are not needed to diagnose."""
+    the OAuth vocabulary, while free-text fields are not needed to diagnose --
+    and a token endpoint answering with someone else's HTML has no code to
+    give, which is what "(no error code)" says."""
     try:
-        error = response.json().get("error")
+        error = json.loads(body).get("error")
     except (ValueError, AttributeError):
         return "(no error code)"
     if isinstance(error, str) and error.replace("_", "").isalnum() and len(error) <= 64:
@@ -343,8 +365,11 @@ def _exchange_code(
     of the redirect, and nothing in it is needed to diagnose a failed exchange.
     """
     try:
-        with httpx.Client(timeout=HTTP_TIMEOUT, verify=True) as http:
-            response = http.post(
+        with httpx.Client(
+            timeout=HTTP_TIMEOUT, verify=True, headers={"User-Agent": USER_AGENT}
+        ) as http:
+            with http.stream(
+                "POST",
                 OAUTH_TOKEN_URL,
                 data={
                     "client_id": client_id,
@@ -353,11 +378,10 @@ def _exchange_code(
                     "redirect_uri": redirect_uri,
                     "state": state,
                 },
-            )
+            ) as response:
+                body = _read_capped(response, "Token exchange response too large")
             response.raise_for_status()
-            if len(response.content) > MAX_RESPONSE_SIZE:
-                raise AuthenticationError("Token exchange response too large")
-            token_response = response.json()
+            token_response = json.loads(body)
     except httpx.HTTPStatusError as e:
         raise AuthenticationError(
             f"Token exchange failed with HTTP {e.response.status_code}"
