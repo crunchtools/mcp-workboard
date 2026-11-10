@@ -14,21 +14,34 @@
 
 # --- Build stage (has /bin/sh, pip, etc.) ---
 
+# Stage 0: Lock (resolve the frozen, Dependabot-maintained uv.lock to a
+# plain requirements file so the builder stage installs exactly what CI
+# tested, not whatever pip would resolve fresh. See RT#1564.)
+FROM quay.io/hummingbird/python:3.14-builder AS lock
+USER 0
+RUN pip install --no-cache-dir uv==0.13.7
+WORKDIR /lock
+COPY pyproject.toml uv.lock ./
+RUN uv export --frozen --no-dev --no-emit-project \
+      --format requirements-txt -o /requirements.txt
+
 # Stage 1: Builder (has a shell, dnf and build tools)
 FROM quay.io/hummingbird/python:3.14-builder AS builder
 USER 0
 WORKDIR /app
 RUN python3 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
+COPY --from=lock /requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Stage 2: Runtime (distroless -- no shell, no package manager)
 FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-workboard-crunchtools" \
-      version="0.16.0" \
+      version="0.16.1" \
       summary="Secure MCP server for WorkBoard OKR and strategy execution" \
       description="A security-focused MCP server for WorkBoard built on Red Hat UBI" \
       maintainer="crunchtools.com" \
