@@ -4,7 +4,7 @@
 > **Ratified:** 2026-03-10
 > **Amended:** 2026-11-09
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.36.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.39.1
 > **Profile:** MCP Server
 
 This file holds what is specific to mcp-workboard. The fleet rules and the
@@ -52,7 +52,7 @@ configurable, to prevent SSRF.
 | GitHub repo | `crunchtools/mcp-workboard` |
 | PyPI package | `mcp-workboard-crunchtools` |
 | Python module | `mcp_workboard_crunchtools` |
-| Container image | `quay.io/crunchtools/mcp-workboard`, `ghcr.io/crunchtools/mcp-workboard` |
+| Container image | `quay.io/crunchtools/mcp-workboard` |
 | systemd service | `mcp-workboard.service` |
 | HTTP port | 8007 |
 | OAuth callback | CLI `login`: `127.0.0.1:8963`; server: `/callback` on the HTTP port, public URL in `WORKBOARD_OAUTH_REDIRECT_URI` |
