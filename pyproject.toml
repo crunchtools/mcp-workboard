@@ -93,4 +93,12 @@ env = { WORKBOARD_API_TOKEN = "test_token_for_ci" }
 
 
 [tool.sdlc]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+publish = "pypi"
 repo-kinds = ["mcp-server"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/mcp-workboard"
+boot = "mcp"
+boot-env = "WORKBOARD_API_TOKEN=gate-dummy\n"
